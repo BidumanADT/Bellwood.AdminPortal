@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36705.20
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Bellwood.AdminPortal", "Bellwood.AdminPortal.csproj", "{56F3269C-DB7C-4CEC-BCC4-E636E18123E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BellwoodGlobal.Core", "..\BellwoodMobileApp\BellwoodGlobal.Mobile\BellwoodGlobal.Core\BellwoodGlobal.Core.csproj", "{4D7F72B3-94F0-5607-8280-81AF904A53F2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56F3269C-DB7C-4CEC-BCC4-E636E18123E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56F3269C-DB7C-4CEC-BCC4-E636E18123E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56F3269C-DB7C-4CEC-BCC4-E636E18123E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56F3269C-DB7C-4CEC-BCC4-E636E18123E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D7F72B3-94F0-5607-8280-81AF904A53F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D7F72B3-94F0-5607-8280-81AF904A53F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D7F72B3-94F0-5607-8280-81AF904A53F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D7F72B3-94F0-5607-8280-81AF904A53F2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {72B87EEF-56A6-446E-AEAA-443521D21168}
+	EndGlobalSection
+EndGlobal

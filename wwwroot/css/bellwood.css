@@ -1,0 +1,74 @@
+﻿/* Bellwood Elite Color Palette */
+:root {
+    --bellwood-gold: #CBA135;
+    --bellwood-cream: #F5F5DC;
+    --bellwood-charcoal: #2D2D2D;
+    --bellwood-ink: #1A1A1A;
+}
+
+body {
+    background-color: var(--bellwood-ink);
+    color: var(--bellwood-cream);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar {
+    background-color: var(--bellwood-charcoal) !important;
+    border-bottom: 2px solid var(--bellwood-gold);
+}
+
+.navbar-brand {
+    color: var(--bellwood-gold) !important;
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.btn-primary {
+    background-color: var(--bellwood-gold);
+    border-color: var(--bellwood-gold);
+    color: var(--bellwood-ink);
+}
+
+    .btn-primary:hover {
+        background-color: #b8932e;
+        border-color: #b8932e;
+    }
+
+.card {
+    background-color: var(--bellwood-charcoal);
+    border: 1px solid var(--bellwood-gold);
+    color: var(--bellwood-cream);
+}
+
+.status-chip {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-requested {
+    background-color: #d97706;
+    color: white;
+}
+
+.status-confirmed {
+    background-color: #059669;
+    color: white;
+}
+
+.status-in-progress {
+    background-color: var(--bellwood-gold);
+    color: var(--bellwood-ink);
+}
+
+.status-completed {
+    background-color: #6b7280;
+    color: white;
+}
+
+.status-cancelled {
+    background-color: #dc2626;
+    color: white;
+}
