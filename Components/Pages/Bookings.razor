@@ -17,23 +17,23 @@
         <div class="col">
             <div class="btn-group" role="group">
                 <button class="btn @(selectedFilter == "All" ? "btn-primary" : "btn-outline-secondary")"
-                        @onclick="() => FilterBookings(@"All")">
+                        @onclick='() => FilterBookings("All")'>
                     All (@allBookings.Count)
                 </button>
                 <button class="btn @(selectedFilter == "Requested" ? "btn-warning" : "btn-outline-secondary")"
-                        @onclick="() => FilterBookings(@"Requested")">
+                        @onclick='() => FilterBookings("Requested")'>
                     Requested (@GetCountByStatus("Requested"))
                 </button>
                 <button class="btn @(selectedFilter == "Confirmed" ? "btn-success" : "btn-outline-secondary")"
-                        @onclick="() => FilterBookings(@"Confirmed")">
+                        @onclick='() => FilterBookings("Confirmed")'>
                     Confirmed (@GetCountByStatus("Confirmed"))
                 </button>
                 <button class="btn @(selectedFilter == "Completed" ? "btn-secondary" : "btn-outline-secondary")"
-                        @onclick="() => FilterBookings(@"Completed")">
+                        @onclick='() => FilterBookings("Completed")'>
                     Completed (@GetCountByStatus("Completed"))
                 </button>
                 <button class="btn @(selectedFilter == "Cancelled" ? "btn-danger" : "btn-outline-secondary")"
-                        @onclick="() => FilterBookings(@"Cancelled")">
+                        @onclick='() => FilterBookings("Cancelled")'>
                     Cancelled (@GetCountByStatus("Cancelled"))
                 </button>
             </div>
