@@ -1,7 +1,11 @@
 ﻿@page "/bookings"
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
 @using BellwoodGlobal.Core.Domain
+@using Bellwood.AdminPortal.Services
+@attribute [Authorize]
 @inject IHttpClientFactory HttpFactory
+@inject IAuthTokenProvider TokenProvider
 
 <PageTitle>Bookings Dashboard - Bellwood Elite</PageTitle>
 
@@ -115,6 +119,12 @@
         try
         {
             var client = HttpFactory.CreateClient("AdminAPI");
+            var token = await TokenProvider.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
             allBookings = await client.GetFromJsonAsync<List<BookingListItem>>("/bookings/list?take=100") ?? new();
             FilterBookings(selectedFilter);
         }

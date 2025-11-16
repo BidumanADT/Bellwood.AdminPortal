@@ -14,8 +14,49 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <CascadingAuthenticationState>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        @{
+                            var returnUrl = "/login";
+                            <RedirectToLogin ReturnUrl="@returnUrl" />
+                        }
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+            </Found>
+            <NotFound>
+                <PageTitle>Not Found</PageTitle>
+                <LayoutView Layout="@typeof(Layout.EmptyLayout)">
+                    <div class="container mt-5">
+                        <div class="alert alert-warning">
+                            <h4>Page Not Found</h4>
+                            <p>Sorry, there's nothing at this address.</p>
+                            <a href="/login" class="btn btn-primary">Go to Login</a>
+                        </div>
+                    </div>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingAuthenticationState>
+
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    private class RedirectToLogin : ComponentBase
+    {
+        [Inject] private NavigationManager Navigation { get; set; } = default!;
+        
+        [Parameter] public string ReturnUrl { get; set; } = "/login";
+
+        protected override void OnInitialized()
+        {
+            // Remove forceLoad to avoid page reload issues
+            Navigation.NavigateTo(ReturnUrl);
+        }
+    }
+}
