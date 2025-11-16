@@ -9,9 +9,18 @@ builder.Services.AddRazorComponents()
 // HTTP Client for calling AdminAPI
 builder.Services.AddHttpClient("AdminAPI", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:5007/"); // Your AdminAPI URL
+    client.BaseAddress = new Uri("https://localhost:5206/");
     client.Timeout = TimeSpan.FromSeconds(30);
+
+#if DEBUG
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+   {
+       ServerCertificateCustomValidationCallback =
+        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+   });
+#else
 });
+#endif
 
 var app = builder.Build();
 
