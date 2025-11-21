@@ -3,7 +3,8 @@
 @using Microsoft.AspNetCore.Authorization
 @using BellwoodGlobal.Core.Domain
 @using Bellwood.AdminPortal.Services
-@attribute [Authorize]
+@using Bellwood.AdminPortal.Auth
+@attribute [StaffAuthorize]
 @inject IHttpClientFactory HttpFactory
 @inject IAuthTokenProvider TokenProvider
 
@@ -110,15 +111,18 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("Bookings: OnInitializedAsync running");
         await LoadBookingsAsync();
     }
 
     private async Task LoadBookingsAsync()
     {
         isLoading = true;
+        Console.WriteLine("Bookings: starting LoadBookingsAsync");
         try
         {
             var client = HttpFactory.CreateClient("AdminAPI");
+            Console.WriteLine("Bookings: calling AdminAPI /bookings/list?take=100");
             var token = await TokenProvider.GetTokenAsync();
             if (!string.IsNullOrEmpty(token))
             {
@@ -126,6 +130,7 @@
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             }
             allBookings = await client.GetFromJsonAsync<List<BookingListItem>>("/bookings/list?take=100") ?? new();
+            Console.WriteLine($"Bookings: received {allBookings.Count} bookings");
             FilterBookings(selectedFilter);
         }
         catch (Exception ex)

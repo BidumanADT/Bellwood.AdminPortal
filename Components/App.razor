@@ -1,33 +1,39 @@
-﻿<!DOCTYPE html>
+﻿@using System.Reflection;
+@using Bellwood.AdminPortal.Auth;
+
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="/" />
-    <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="css/bellwood.css" />
-    <link rel="stylesheet" href="Bellwood.AdminPortal.styles.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    …
 </head>
-
 <body>
     <CascadingAuthenticationState>
         <Router AppAssembly="@typeof(App).Assembly">
             <Found Context="routeData">
-                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
-                    <NotAuthorized>
-                        @{
-                            var returnUrl = "/login";
-                            <RedirectToLogin ReturnUrl="@returnUrl" />
-                        }
-                    </NotAuthorized>
-                </AuthorizeRouteView>
+                @{
+                    bool requiresAuth = routeData.PageType
+                        .GetCustomAttributes(inherit: true)
+                        .Any(attr => attr is StaffAuthorizeAttribute);
+
+                    if (requiresAuth)
+                    {
+                        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+                            <NotAuthorized>
+                                <RedirectToLogin ReturnUrl="/login" />
+                            </NotAuthorized>
+                        </AuthorizeRouteView>
+                    }
+                    else
+                    {
+                        var defaultLayout =
+                            (routeData.PageType.GetCustomAttribute<LayoutAttribute>(inherit: true)?.LayoutType)
+                            ?? typeof(Layout.MainLayout);
+
+                        <RouteView RouteData="@routeData" DefaultLayout="@defaultLayout" />
+                    }
+                }
             </Found>
             <NotFound>
-                <PageTitle>Not Found</PageTitle>
                 <LayoutView Layout="@typeof(Layout.EmptyLayout)">
                     <div class="container mt-5">
                         <div class="alert alert-warning">
@@ -43,20 +49,4 @@
 
     <script src="_framework/blazor.web.js"></script>
 </body>
-
 </html>
-
-@code {
-    private class RedirectToLogin : ComponentBase
-    {
-        [Inject] private NavigationManager Navigation { get; set; } = default!;
-        
-        [Parameter] public string ReturnUrl { get; set; } = "/login";
-
-        protected override void OnInitialized()
-        {
-            // Remove forceLoad to avoid page reload issues
-            Navigation.NavigateTo(ReturnUrl);
-        }
-    }
-}

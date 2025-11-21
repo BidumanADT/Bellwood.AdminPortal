@@ -1,25 +1,28 @@
 using Bellwood.AdminPortal.Components;
 using Bellwood.AdminPortal.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Razor components (Blazor Web App - Server interactivity)
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add Cookie Authentication
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/login";
-        options.LogoutPath = "/logout";
-        options.ExpireTimeSpan = TimeSpan.FromHours(10); // Staff session duration
-        options.SlidingExpiration = true;
-    });
+// Blazor-style auth
+builder.Services.AddAuthorizationCore();
 
-builder.Services.AddAuthorization();
-builder.Services.AddCascadingAuthenticationState(); // Enable auth state in Blazor
+// Token store + auth state provider
+builder.Services.AddScoped<IAuthTokenProvider, AuthTokenProvider>();
+
+// Register the concrete provider so we can inject it directly
+builder.Services.AddScoped<JwtAuthenticationStateProvider>();
+
+// Expose it as the AuthenticationStateProvider used by Router/AuthorizeView
+builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
+    sp.GetRequiredService<JwtAuthenticationStateProvider>());
+
+// Give components access to the auth state cascade
+builder.Services.AddCascadingAuthenticationState();
 
 // Auth Server HTTP Client
 builder.Services.AddHttpClient("AuthServer", client =>
@@ -53,9 +56,6 @@ builder.Services.AddHttpClient("AdminAPI", client =>
 ;
 #endif
 
-// Custom service to attach tokens to API calls
-builder.Services.AddScoped<IAuthTokenProvider, AuthTokenProvider>();
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -68,9 +68,6 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
