@@ -38,6 +38,13 @@ body {
     background-color: var(--bellwood-charcoal);
     border: 1px solid var(--bellwood-gold);
     color: var(--bellwood-cream);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(203, 161, 53, 0.3);
+    border-color: var(--bellwood-gold);
 }
 
 .status-chip {
