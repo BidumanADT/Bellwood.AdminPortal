@@ -1,0 +1,17 @@
+﻿@page "/logout"
+@using Bellwood.AdminPortal.Services
+@inject NavigationManager Navigation
+@inject IAuthTokenProvider TokenProvider
+@inject JwtAuthenticationStateProvider JwtAuthenticationStateProvider
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TokenProvider.ClearTokenAsync();
+        await JwtAuthenticationStateProvider.MarkUserAsLoggedOutAsync();
+        Navigation.NavigateTo("/login");
+    }
+}

@@ -1,17 +1,61 @@
 using Bellwood.AdminPortal.Components;
+using Bellwood.AdminPortal.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Razor components (Blazor Web App - Server interactivity)
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();  // Enables Server-side Blazor
+    .AddInteractiveServerComponents();
 
-// HTTP Client for calling AdminAPI
+// Blazor-style auth
+builder.Services.AddAuthorizationCore();
+
+// Token store + auth state provider - MUST BE SINGLETON to persist across circuits
+builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
+builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
+
+// Register the concrete provider as singleton so it persists
+builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
+
+// Expose it as the AuthenticationStateProvider used by Router/AuthorizeView
+builder.Services.AddSingleton<AuthenticationStateProvider>(sp =>
+    sp.GetRequiredService<JwtAuthenticationStateProvider>());
+
+// Give components access to the auth state cascade
+builder.Services.AddCascadingAuthenticationState();
+
+// Auth Server HTTP Client
+builder.Services.AddHttpClient("AuthServer", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:5001/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+#if DEBUG
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback =
+        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
+#else
+;
+#endif
+
+// AdminAPI HTTP Client (with token attachment)
 builder.Services.AddHttpClient("AdminAPI", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:5007/"); // Your AdminAPI URL
+    client.BaseAddress = new Uri("https://localhost:5206/");
     client.Timeout = TimeSpan.FromSeconds(30);
+})
+#if DEBUG
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback =
+        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
+#else
+;
+#endif
 
 var app = builder.Build();
 
@@ -26,7 +70,6 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-// Map Razor Components with Server interactivity
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

@@ -1,101 +1,128 @@
 ﻿@page "/bookings"
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
 @using BellwoodGlobal.Core.Domain
+@using Bellwood.AdminPortal.Services
+@using System.Net.Http.Headers
 @inject IHttpClientFactory HttpFactory
+@inject IAuthTokenProvider TokenProvider
+@inject IAdminApiKeyProvider ApiKeyProvider
+@inject NavigationManager Navigation
 
 <PageTitle>Bookings Dashboard - Bellwood Elite</PageTitle>
 
-<div class="container-fluid py-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h2 class="text-bellwood-gold">📋 Bookings Dashboard</h2>
-        </div>
-    </div>
-
-    <!-- Filter Buttons -->
-    <div class="row mb-3">
-        <div class="col">
-            <div class="btn-group" role="group">
-                <button class="btn @(selectedFilter == "All" ? "btn-primary" : "btn-outline-secondary")"
-                        @onclick='() => FilterBookings("All")'>
-                    All (@allBookings.Count)
-                </button>
-                <button class="btn @(selectedFilter == "Requested" ? "btn-warning" : "btn-outline-secondary")"
-                        @onclick='() => FilterBookings("Requested")'>
-                    Requested (@GetCountByStatus("Requested"))
-                </button>
-                <button class="btn @(selectedFilter == "Confirmed" ? "btn-success" : "btn-outline-secondary")"
-                        @onclick='() => FilterBookings("Confirmed")'>
-                    Confirmed (@GetCountByStatus("Confirmed"))
-                </button>
-                <button class="btn @(selectedFilter == "Completed" ? "btn-secondary" : "btn-outline-secondary")"
-                        @onclick='() => FilterBookings("Completed")'>
-                    Completed (@GetCountByStatus("Completed"))
-                </button>
-                <button class="btn @(selectedFilter == "Cancelled" ? "btn-danger" : "btn-outline-secondary")"
-                        @onclick='() => FilterBookings("Cancelled")'>
-                    Cancelled (@GetCountByStatus("Cancelled"))
-                </button>
+<AuthorizeView>
+    <Authorized>
+        @{
+            Console.WriteLine("[Bookings] AuthorizeView: Authorized section rendering");
+        }
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="text-bellwood-gold">📋 Bookings Dashboard</h2>
+                </div>
             </div>
-            <button class="btn btn-primary ms-3" @onclick="LoadBookingsAsync">
-                🔄 Refresh
-            </button>
-        </div>
-    </div>
 
-    <!-- Search Bar -->
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <input type="text" class="form-control" placeholder="Search by name, location..."
-                   @bind="searchQuery" @bind:event="oninput" />
-        </div>
-    </div>
-
-    <!-- Bookings List -->
-    @if (isLoading)
-    {
-        <div class="text-center py-5">
-            <div class="spinner-border text-bellwood-gold" role="status">
-                <span class="visually-hidden">Loading...</span>
+            <!-- Filter Buttons -->
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="btn-group" role="group">
+                        <button class="btn @(selectedFilter == "All" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("All")'>
+                            All (@allBookings.Count)
+                        </button>
+                        <button class="btn @(selectedFilter == "Requested" ? "btn-warning" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("Requested")'>
+                            Requested (@GetCountByStatus("Requested"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Confirmed" ? "btn-success" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("Confirmed")'>
+                            Confirmed (@GetCountByStatus("Confirmed"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Completed" ? "btn-secondary" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("Completed")'>
+                            Completed (@GetCountByStatus("Completed"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Cancelled" ? "btn-danger" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("Cancelled")'>
+                            Cancelled (@GetCountByStatus("Cancelled"))
+                        </button>
+                    </div>
+                    <button class="btn btn-primary ms-3" @onclick="LoadBookingsAsync">
+                        🔄 Refresh
+                    </button>
+                </div>
             </div>
-        </div>
-    }
-    else if (!filteredBookings.Any())
-    {
-        <div class="alert alert-info">
-            No bookings found. Try changing your filter or search query.
-        </div>
-    }
-    else
-    {
-        <div class="row">
-            @foreach (var booking in filteredBookings)
+
+            <!-- Search Bar -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" placeholder="Search by name, location..."
+                           @bind="searchQuery" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <!-- Bookings List -->
+            @if (isLoading)
             {
-                <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card" style="cursor: pointer;" @onclick="() => ViewDetails(booking.Id)">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="card-title mb-0">@booking.PassengerName</h5>
-                                <span class="status-chip status-@(booking.Status?.ToLower() ?? "requested")">
-                                    @booking.Status
-                                </span>
-                            </div>
-                            <p class="card-text text-muted mb-1">
-                                <strong>@booking.VehicleClass</strong> • @booking.PickupDateTime.ToLocalTime().ToString("g")
-                            </p>
-                            <p class="card-text mb-1">
-                                📍 @booking.PickupLocation
-                            </p>
-                            <p class="card-text text-muted small">
-                                Booker: @booking.BookerName • Created: @booking.CreatedUtc.ToLocalTime().ToString("g")
-                            </p>
-                        </div>
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
                 </div>
             }
+            else if (!filteredBookings.Any())
+            {
+                <div class="alert alert-info">
+                    No bookings found. Try changing your filter or search query.
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @foreach (var booking in filteredBookings)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card" style="cursor: pointer;" @onclick="() => ViewDetails(booking.Id)">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-0">@booking.PassengerName</h5>
+                                        <span class="status-chip status-@(booking.Status?.ToLower() ?? "requested")">
+                                            @booking.Status
+                                        </span>
+                                    </div>
+                                    <p class="card-text text-muted mb-1">
+                                        <strong>@booking.VehicleClass</strong> • @booking.PickupDateTime.ToLocalTime().ToString("g")
+                                    </p>
+                                    <p class="card-text mb-1">
+                                        📍 @booking.PickupLocation
+                                    </p>
+                                    <p class="card-text text-muted small">
+                                        Booker: @booking.BookerName • Created: @booking.CreatedUtc.ToLocalTime().ToString("g")
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
         </div>
-    }
-</div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Console.WriteLine("[Bookings] AuthorizeView: NotAuthorized section rendering - redirecting to login");
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">
+        @errorMessage
+        <button class="btn btn-sm btn-outline-danger ms-2" @onclick="LoadBookingsAsync">Retry</button>
+    </div>
+}
 
 @code {
     private List<BookingListItem> allBookings = new();
@@ -103,30 +130,65 @@
     private string selectedFilter = "All";
     private string searchQuery = "";
     private bool isLoading = false;
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("Bookings: OnInitializedAsync running");
         await LoadBookingsAsync();
     }
 
     private async Task LoadBookingsAsync()
     {
         isLoading = true;
+        errorMessage = null;
+        
         try
         {
             var client = HttpFactory.CreateClient("AdminAPI");
-            allBookings = await client.GetFromJsonAsync<List<BookingListItem>>("/bookings/list?take=100") ?? new();
+
+            //Attach API key if configured
+            var apiKey = ApiKeyProvider.GetApiKey();
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.TryAddWithoutValidation("X-Admin-ApiKey", apiKey);
+                Console.WriteLine($"API Key added: {apiKey}");
+            }
+
+            // Attach JWT if you later secure the API with Bearer tokens
+            var token = await TokenProvider.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+                Console.WriteLine("Bearer token added");
+            }
+
+            Console.WriteLine("Fetching bookings from AdminAPI...");
+            allBookings = await client.GetFromJsonAsync<List<BookingListItem>>(
+                "/bookings/list?take=100") ?? new();
+            
+            Console.WriteLine($"Loaded {allBookings.Count} bookings");
             FilterBookings(selectedFilter);
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Failed to load bookings: {ex.Message}";
+            Console.WriteLine($"HTTP Error: {errorMessage}");
+            allBookings.Clear();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading bookings: {ex.Message}");
+            errorMessage = $"Error: {ex.Message}";
+            Console.WriteLine($"Error loading bookings: {errorMessage}");
+            allBookings.Clear();
         }
         finally
         {
             isLoading = false;
         }
     }
+
 
     private void FilterBookings(string status)
     {
