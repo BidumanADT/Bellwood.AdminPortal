@@ -1,0 +1,283 @@
+﻿@page "/quotes"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using BellwoodGlobal.Core.Domain
+@using Bellwood.AdminPortal.Services
+@using System.Net.Http.Headers
+@inject IHttpClientFactory HttpFactory
+@inject IAuthTokenProvider TokenProvider
+@inject IAdminApiKeyProvider ApiKeyProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Quotes Dashboard - Bellwood Elite</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        @{
+            Console.WriteLine("[Quotes] AuthorizeView: Authorized section rendering");
+        }
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="text-bellwood-gold">💰 Quotes Dashboard</h2>
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="btn-group" role="group">
+                        <button class="btn @(selectedFilter == "All" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("All")'>
+                            All (@allQuotes.Count)
+                        </button>
+                        <button class="btn @(selectedFilter == "Submitted" ? "btn-info" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Submitted")'>
+                            Submitted (@GetCountByStatus("Submitted"))
+                        </button>
+                        <button class="btn @(selectedFilter == "InReview" ? "btn-warning" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("InReview")'>
+                            In Review (@GetCountByStatus("InReview"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Priced" ? "btn-success" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Priced")'>
+                            Priced (@GetCountByStatus("Priced"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Rejected" ? "btn-danger" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Rejected")'>
+                            Rejected (@GetCountByStatus("Rejected"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Closed" ? "btn-secondary" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Closed")'>
+                            Closed (@GetCountByStatus("Closed"))
+                        </button>
+                    </div>
+                    <button class="btn btn-primary ms-3" @onclick="LoadQuotesAsync">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" placeholder="Search by name, location..."
+                           @bind="searchQuery" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @errorMessage
+                    <button class="btn btn-sm btn-outline-danger ms-2" @onclick="LoadQuotesAsync">
+                        Retry
+                    </button>
+                </div>
+            }
+
+            <!-- Quotes List -->
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading quotes...</p>
+                </div>
+            }
+            else if (!filteredQuotes.Any())
+            {
+                <div class="alert alert-info">
+                    No quotes found. Try changing your filter or search query.
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @foreach (var quote in filteredQuotes)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card" style="cursor: pointer;" @onclick="() => ViewDetails(quote.Id)">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-0">@quote.PassengerName</h5>
+                                        <span class="status-chip status-@(GetStatusClass(quote.Status))">
+                                            @FormatStatus(quote.Status)
+                                        </span>
+                                    </div>
+                                    <p class="card-text text-muted mb-1">
+                                        <strong>@quote.VehicleClass</strong> • @quote.PickupDateTime.ToLocalTime().ToString("g")
+                                    </p>
+                                    <p class="card-text mb-1">
+                                        📍 @quote.PickupLocation
+                                    </p>
+                                    @if (!string.IsNullOrEmpty(quote.DropoffLocation))
+                                    {
+                                        <p class="card-text mb-1 text-muted small">
+                                            → @quote.DropoffLocation
+                                        </p>
+                                    }
+                                    <p class="card-text text-muted small">
+                                        Booker: @quote.BookerName • Created: @quote.CreatedUtc.ToLocalTime().ToString("g")
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Console.WriteLine("[Quotes] AuthorizeView: NotAuthorized section rendering - redirecting to login");
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<QuoteListItem> allQuotes = new();
+    private List<QuoteListItem> filteredQuotes = new();
+    private string selectedFilter = "All";
+    private string searchQuery = "";
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("[Quotes] OnInitializedAsync running");
+        await LoadQuotesAsync();
+    }
+
+    private async Task LoadQuotesAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var client = HttpFactory.CreateClient("AdminAPI");
+
+            // Attach API key if configured
+            var apiKey = ApiKeyProvider.GetApiKey();
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.TryAddWithoutValidation("X-Admin-ApiKey", apiKey);
+                Console.WriteLine($"[Quotes] API Key added: {apiKey}");
+            }
+
+            // Attach JWT if available (for future OAuth integration)
+            var token = await TokenProvider.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+                Console.WriteLine("[Quotes] Bearer token added");
+            }
+
+            Console.WriteLine("[Quotes] Fetching quotes from AdminAPI...");
+            var response = await client.GetAsync("/quotes/list?take=100");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                errorMessage = $"API returned {response.StatusCode}: {errorContent}";
+                Console.WriteLine($"[Quotes] Error: {errorMessage}");
+                allQuotes.Clear();
+                return;
+            }
+
+            allQuotes = await response.Content.ReadFromJsonAsync<List<QuoteListItem>>() ?? new();
+            Console.WriteLine($"[Quotes] Loaded {allQuotes.Count} quotes");
+
+            FilterQuotes(selectedFilter);
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Failed to connect to AdminAPI: {ex.Message}";
+            Console.WriteLine($"[Quotes] HTTP Error: {errorMessage}");
+            allQuotes.Clear();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+            Console.WriteLine($"[Quotes] Error loading quotes: {errorMessage}");
+            allQuotes.Clear();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void FilterQuotes(string status)
+    {
+        selectedFilter = status;
+        filteredQuotes = status == "All"
+            ? allQuotes.Where(MatchesSearch).ToList()
+            : allQuotes.Where(q => q.Status?.Equals(status, StringComparison.OrdinalIgnoreCase) == true)
+                       .Where(MatchesSearch).ToList();
+
+        Console.WriteLine($"[Quotes] Filtered to {filteredQuotes.Count} quotes with status: {status}");
+    }
+
+    private bool MatchesSearch(QuoteListItem q)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery)) return true;
+        var query = searchQuery.ToLowerInvariant();
+        return q.PassengerName?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+               q.BookerName?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+               q.PickupLocation?.Contains(query, StringComparison.OrdinalIgnoreCase) == true ||
+               q.DropoffLocation?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private int GetCountByStatus(string status)
+    {
+        return allQuotes.Count(q => q.Status?.Equals(status, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private string GetStatusClass(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "submitted" => "submitted",
+            "inreview" => "inreview",
+            "priced" => "priced",
+            "rejected" => "rejected",
+            "closed" => "closed",
+            _ => "submitted"
+        };
+    }
+
+    private string FormatStatus(string? status)
+    {
+        return status switch
+        {
+            "InReview" => "In Review",
+            _ => status ?? "Submitted"
+        };
+    }
+
+    private void ViewDetails(string quoteId)
+    {
+        // TODO: Navigate to detail page or show modal
+        Console.WriteLine($"[Quotes] View quote: {quoteId}");
+    }
+
+    // DTO model (matches AdminAPI response)
+    public class QuoteListItem
+    {
+        public string Id { get; set; } = "";
+        public DateTime CreatedUtc { get; set; }
+        public string? Status { get; set; }
+        public string BookerName { get; set; } = "";
+        public string PassengerName { get; set; } = "";
+        public string VehicleClass { get; set; } = "";
+        public string PickupLocation { get; set; } = "";
+        public string? DropoffLocation { get; set; }
+        public DateTime PickupDateTime { get; set; }
+    }
+}
