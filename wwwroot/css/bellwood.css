@@ -79,3 +79,29 @@ body {
     background-color: #dc2626;
     color: white;
 }
+
+/* Quote Status Chips */
+.status-submitted {
+    background-color: #0dcaf0;
+    color: #000;
+}
+
+.status-inreview {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.status-priced {
+    background-color: #198754;
+    color: #fff;
+}
+
+.status-rejected {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.status-closed {
+    background-color: #6c757d;
+    color: #fff;
+}
