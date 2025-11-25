@@ -32,14 +32,14 @@
                             <label class="form-label">Username</label>
                             <InputText @bind-Value="loginModel.Username"
                                        class="form-control"
-                                       placeholder="alice" />
+                                       placeholder="Username" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Password</label>
                             <InputText @bind-Value="loginModel.Password"
                                        type="password"
                                        class="form-control"
-                                       placeholder="password" />
+                                       placeholder="Password" />
                         </div>
                         <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
                             @if (isLoading)
@@ -98,10 +98,10 @@
                         loginModel.Username ?? "", 
                         result.AccessToken);
 
-                    Console.WriteLine("[Login] Auth state updated, navigating to /bookings");
+                    Console.WriteLine("[Login] Auth state updated, navigating to /main");
 
-                    // Redirect to bookings page
-                    Navigation.NavigateTo("/bookings", forceLoad: false);
+                    // Redirect to main page
+                    Navigation.NavigateTo("/main", forceLoad: false);
                 }
                 else
                 {

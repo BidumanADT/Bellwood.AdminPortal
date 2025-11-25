@@ -1,0 +1,123 @@
+﻿@page "/main"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+<PageTitle>Bellwood Elite - Admin Portal</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid py-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <!-- Header -->
+                    <div class="text-center mb-5">
+                        <h1 class="display-4 text-bellwood-gold">🚕 Bellwood Elite</h1>
+                        <h2 class="h3 text-muted">Admin Portal</h2>
+                        <p class="lead">Welcome, @context.User.Identity?.Name!</p>
+                    </div>
+
+                    <!-- Main Navigation Cards -->
+                    <div class="row g-4 mt-4">
+                        <!-- Bookings Card -->
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 shadow-sm hover-card" style="cursor: pointer;" @onclick="NavigateToBookings">
+                                <div class="card-body text-center p-4">
+                                    <div class="mb-3">
+                                        <span class="display-3">📋</span>
+                                    </div>
+                                    <h3 class="card-title h4 mb-3">Bookings</h3>
+                                    <p class="card-text text-muted">
+                                        View and manage customer bookings, update statuses, and track reservations.
+                                    </p>
+                                    <button class="btn btn-primary mt-3">
+                                        View Bookings →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quotes Card (Coming Soon) -->
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 shadow-sm" style="opacity: 0.6;">
+                                <div class="card-body text-center p-4">
+                                    <div class="mb-3">
+                                        <span class="display-3">💰</span>
+                                    </div>
+                                    <h3 class="card-title h4 mb-3">Quotes</h3>
+                                    <p class="card-text text-muted">
+                                        Review quote requests, provide pricing, and convert to bookings.
+                                    </p>
+                                    <button class="btn btn-secondary mt-3" disabled>
+                                        Coming Soon
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dashboard Card (Future) -->
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 shadow-sm" style="opacity: 0.6;">
+                                <div class="card-body text-center p-4">
+                                    <div class="mb-3">
+                                        <span class="display-3">📊</span>
+                                    </div>
+                                    <h3 class="card-title h4 mb-3">Dashboard</h3>
+                                    <p class="card-text text-muted">
+                                        View metrics, analytics, and key performance indicators at a glance.
+                                    </p>
+                                    <button class="btn btn-secondary mt-3" disabled>
+                                        Coming Soon
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="row mt-5">
+                        <div class="col-12">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h4 class="card-title mb-3">Quick Actions</h4>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-outline-primary" @onclick="NavigateToBookings">
+                                            📋 View All Bookings
+                                        </button>
+                                        <button class="btn btn-outline-secondary" disabled>
+                                            💰 View Quotes (Coming Soon)
+                                        </button>
+                                        <a href="/logout" class="btn btn-outline-danger">
+                                            🚪 Logout
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Info -->
+                    <div class="text-center mt-5 text-muted">
+                        <small>
+                            Bellwood Elite Admin Portal • Staff Access
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Console.WriteLine("[Main] User not authorized, redirecting to login");
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private void NavigateToBookings()
+    {
+        Console.WriteLine("[Main] Navigating to bookings");
+        Navigation.NavigateTo("/bookings");
+    }
+}
