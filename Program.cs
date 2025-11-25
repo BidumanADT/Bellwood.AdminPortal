@@ -11,14 +11,15 @@ builder.Services.AddRazorComponents()
 // Blazor-style auth
 builder.Services.AddAuthorizationCore();
 
-// Token store + auth state provider
-builder.Services.AddScoped<IAuthTokenProvider, AuthTokenProvider>();
+// Token store + auth state provider - MUST BE SINGLETON to persist across circuits
+builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
+builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
 
-// Register the concrete provider so we can inject it directly
-builder.Services.AddScoped<JwtAuthenticationStateProvider>();
+// Register the concrete provider as singleton so it persists
+builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 
 // Expose it as the AuthenticationStateProvider used by Router/AuthorizeView
-builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
+builder.Services.AddSingleton<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
 // Give components access to the auth state cascade

@@ -1,9 +1,8 @@
 ﻿@page "/logout"
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
 @using Bellwood.AdminPortal.Services
 @inject NavigationManager Navigation
 @inject IAuthTokenProvider TokenProvider
+@inject JwtAuthenticationStateProvider JwtAuthenticationStateProvider
 
 @code {
     [CascadingParameter]
@@ -12,7 +11,7 @@
     protected override async Task OnInitializedAsync()
     {
         await TokenProvider.ClearTokenAsync();
-        await HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        Navigation.NavigateTo("/login", forceLoad: true);
+        await JwtAuthenticationStateProvider.MarkUserAsLoggedOutAsync();
+        Navigation.NavigateTo("/login");
     }
 }
