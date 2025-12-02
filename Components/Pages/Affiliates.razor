@@ -1,0 +1,378 @@
+@page "/affiliates"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@inject IAffiliateService AffiliateService
+@inject NavigationManager Navigation
+
+<PageTitle>Affiliates - Bellwood Elite</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="text-bellwood-gold">?? Affiliate Management</h2>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary" @onclick="ShowCreateForm">
+                        + Create Affiliate
+                    </button>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show">
+                    @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            <!-- Create/Edit Form -->
+            @if (showForm)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="card-title mb-3">@(editingAffiliateId == null ? "Create New Affiliate" : "Edit Affiliate")</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name *</label>
+                                <input type="text" class="form-control" @bind="formModel.Name" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Point of Contact</label>
+                                <input type="text" class="form-control" @bind="formModel.PointOfContact" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone *</label>
+                                <input type="text" class="form-control" @bind="formModel.Phone" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" @bind="formModel.Email" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Street Address</label>
+                                <input type="text" class="form-control" @bind="formModel.StreetAddress" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City</label>
+                                <input type="text" class="form-control" @bind="formModel.City" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">State</label>
+                                <input type="text" class="form-control" @bind="formModel.State" placeholder="IL" />
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" @onclick="SaveAffiliate" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Save
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CancelForm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Affiliates List -->
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (!affiliates.Any())
+            {
+                <div class="alert alert-info">
+                    No affiliates found. Create your first affiliate to get started.
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @foreach (var affiliate in affiliates)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">@affiliate.Name</h5>
+                                    
+                                    @if (!string.IsNullOrEmpty(affiliate.PointOfContact))
+                                    {
+                                        <p class="card-text small mb-1">
+                                            <strong>Contact:</strong> @affiliate.PointOfContact
+                                        </p>
+                                    }
+                                    
+                                    <p class="card-text small mb-1">
+                                        <strong>Phone:</strong> @affiliate.Phone
+                                    </p>
+                                    
+                                    <p class="card-text small mb-1">
+                                        <strong>Email:</strong> @affiliate.Email
+                                    </p>
+                                    
+                                    @if (!string.IsNullOrEmpty(affiliate.City) || !string.IsNullOrEmpty(affiliate.State))
+                                    {
+                                        <p class="card-text small mb-1">
+                                            <strong>Location:</strong> @affiliate.City@(string.IsNullOrEmpty(affiliate.City) ? "" : ", ")@affiliate.State
+                                        </p>
+                                    }
+                                    
+                                    <p class="card-text small text-muted mt-2">
+                                        @affiliate.Drivers.Count driver(s)
+                                    </p>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewAffiliateDetails(affiliate.Id)">
+                                            View Details
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditAffiliate(affiliate)">
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(affiliate)">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Delete Confirmation Modal -->
+            @if (deleteConfirmAffiliate != null)
+            {
+                <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Confirm Delete</h5>
+                                <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Are you sure you want to delete <strong>@deleteConfirmAffiliate.Name</strong>?</p>
+                                <p class="text-warning">
+                                    ?? This will also delete <strong>@deleteConfirmAffiliate.Drivers.Count driver(s)</strong> associated with this affiliate.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CancelDelete">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn btn-danger" @onclick="DeleteAffiliate" disabled="@isDeleting">
+                                    @if (isDeleting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<AffiliateDto> affiliates = new();
+    private AffiliateDto formModel = new();
+    private AffiliateDto? deleteConfirmAffiliate;
+    
+    private bool isLoading = true;
+    private bool showForm = false;
+    private bool isSaving = false;
+    private bool isDeleting = false;
+    private string? editingAffiliateId;
+    
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAffiliatesAsync();
+    }
+
+    private async Task LoadAffiliatesAsync()
+    {
+        isLoading = true;
+        try
+        {
+            affiliates = await AffiliateService.GetAffiliatesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load affiliates: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        formModel = new AffiliateDto();
+        editingAffiliateId = null;
+        showForm = true;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void EditAffiliate(AffiliateDto affiliate)
+    {
+        formModel = new AffiliateDto
+        {
+            Id = affiliate.Id,
+            Name = affiliate.Name,
+            PointOfContact = affiliate.PointOfContact,
+            Phone = affiliate.Phone,
+            Email = affiliate.Email,
+            StreetAddress = affiliate.StreetAddress,
+            City = affiliate.City,
+            State = affiliate.State
+        };
+        editingAffiliateId = affiliate.Id;
+        showForm = true;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        formModel = new();
+        editingAffiliateId = null;
+    }
+
+    private async Task SaveAffiliate()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.Name) || 
+            string.IsNullOrWhiteSpace(formModel.Phone) || 
+            string.IsNullOrWhiteSpace(formModel.Email))
+        {
+            errorMessage = "Please fill in all required fields (Name, Phone, Email).";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (editingAffiliateId == null)
+            {
+                // Create new
+                var id = await AffiliateService.CreateAffiliateAsync(formModel);
+                formModel.Id = id;
+                affiliates.Add(formModel);
+                successMessage = "Affiliate created successfully!";
+            }
+            else
+            {
+                // Update existing
+                await AffiliateService.UpdateAffiliateAsync(editingAffiliateId, formModel);
+                var existing = affiliates.FirstOrDefault(a => a.Id == editingAffiliateId);
+                if (existing != null)
+                {
+                    existing.Name = formModel.Name;
+                    existing.PointOfContact = formModel.PointOfContact;
+                    existing.Phone = formModel.Phone;
+                    existing.Email = formModel.Email;
+                    existing.StreetAddress = formModel.StreetAddress;
+                    existing.City = formModel.City;
+                    existing.State = formModel.State;
+                }
+                successMessage = "Affiliate updated successfully!";
+            }
+
+            CancelForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save affiliate: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete(AffiliateDto affiliate)
+    {
+        deleteConfirmAffiliate = affiliate;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CancelDelete()
+    {
+        deleteConfirmAffiliate = null;
+    }
+
+    private async Task DeleteAffiliate()
+    {
+        if (deleteConfirmAffiliate == null) return;
+
+        isDeleting = true;
+        errorMessage = null;
+
+        try
+        {
+            await AffiliateService.DeleteAffiliateAsync(deleteConfirmAffiliate.Id);
+            affiliates.Remove(deleteConfirmAffiliate);
+            successMessage = $"Affiliate '{deleteConfirmAffiliate.Name}' deleted successfully.";
+            deleteConfirmAffiliate = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete affiliate: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void ViewAffiliateDetails(string affiliateId)
+    {
+        Navigation.NavigateTo($"/affiliates/{affiliateId}");
+    }
+}

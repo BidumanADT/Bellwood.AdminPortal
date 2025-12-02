@@ -15,6 +15,9 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
 builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
 
+// Business services
+builder.Services.AddScoped<IAffiliateService, AffiliateService>();
+
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 

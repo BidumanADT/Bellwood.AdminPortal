@@ -100,6 +100,17 @@
                                     <p class="card-text text-muted small">
                                         Booker: @booking.BookerName • Created: @booking.CreatedUtc.ToLocalTime().ToString("g")
                                     </p>
+                                    <p class="card-text small mt-2">
+                                        <strong>Driver:</strong> 
+                                        @if (string.IsNullOrEmpty(booking.AssignedDriverName))
+                                        {
+                                            <span class="text-warning">Unassigned</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success">@booking.AssignedDriverName</span>
+                                        }
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -199,6 +210,12 @@
                          .Where(MatchesSearch).ToList();
     }
 
+    private void ViewDetails(string bookingId)
+    {
+        Console.WriteLine($"[Bookings] View booking: {bookingId}");
+        Navigation.NavigateTo($"/bookings/{bookingId}");
+    }
+
     private bool MatchesSearch(BookingListItem b)
     {
         if (string.IsNullOrWhiteSpace(searchQuery)) return true;
@@ -214,13 +231,7 @@
         return allBookings.Count(b => b.Status?.Equals(status, StringComparison.OrdinalIgnoreCase) == true);
     }
 
-    private void ViewDetails(string bookingId)
-    {
-        // TODO: Navigate to detail page
-        Console.WriteLine($"View booking: {bookingId}");
-    }
-
-    // DTO model (matches mobile app)
+    // DTO model (matches AdminAPI response)
     public class BookingListItem
     {
         public string Id { get; set; } = "";
@@ -232,5 +243,9 @@
         public string PickupLocation { get; set; } = "";
         public string? DropoffLocation { get; set; }
         public DateTime PickupDateTime { get; set; }
+        
+        // Driver assignment fields
+        public string? AssignedDriverId { get; set; }
+        public string? AssignedDriverName { get; set; }
     }
 }

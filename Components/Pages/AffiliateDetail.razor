@@ -1,0 +1,272 @@
+@page "/affiliates/{AffiliateId}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@inject IAffiliateService AffiliateService
+@inject NavigationManager Navigation
+
+<PageTitle>Affiliate Details - Bellwood Elite</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <button class="btn btn-outline-secondary mb-3" @onclick="GoBack">
+                        ? Back to Affiliates
+                    </button>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (affiliate == null)
+            {
+                <div class="alert alert-danger">
+                    Affiliate not found.
+                </div>
+            }
+            else
+            {
+                <!-- Affiliate Info Card -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h2 class="text-bellwood-gold mb-4">@affiliate.Name</h2>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                @if (!string.IsNullOrEmpty(affiliate.PointOfContact))
+                                {
+                                    <p><strong>Point of Contact:</strong> @affiliate.PointOfContact</p>
+                                }
+                                <p><strong>Phone:</strong> @affiliate.Phone</p>
+                                <p><strong>Email:</strong> @affiliate.Email</p>
+                            </div>
+                            <div class="col-md-6">
+                                @if (!string.IsNullOrEmpty(affiliate.StreetAddress))
+                                {
+                                    <p><strong>Address:</strong> @affiliate.StreetAddress</p>
+                                }
+                                @if (!string.IsNullOrEmpty(affiliate.City) || !string.IsNullOrEmpty(affiliate.State))
+                                {
+                                    <p><strong>Location:</strong> @affiliate.City@(string.IsNullOrEmpty(affiliate.City) ? "" : ", ")@affiliate.State</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drivers Section -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h4 class="card-title mb-0">Drivers (@affiliate.Drivers.Count)</h4>
+                            <button class="btn btn-primary" @onclick="ShowAddDriverForm">
+                                + Add Driver
+                            </button>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show">
+                                @successMessage
+                                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                @errorMessage
+                                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                            </div>
+                        }
+
+                        <!-- Add Driver Form -->
+                        @if (showAddForm)
+                        {
+                            <div class="card mb-4" style="background: rgba(203, 161, 53, 0.1);">
+                                <div class="card-body">
+                                    <h5 class="mb-3">Add New Driver</h5>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Driver Name *</label>
+                                            <input type="text" class="form-control" @bind="newDriverName" />
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Phone *</label>
+                                            <input type="text" class="form-control" @bind="newDriverPhone" />
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary" @onclick="SaveDriver" disabled="@isSavingDriver">
+                                            @if (isSavingDriver)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                            }
+                                            Save Driver
+                                        </button>
+                                        <button class="btn btn-secondary" @onclick="CancelAddForm">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Drivers List -->
+                        @if (!affiliate.Drivers.Any())
+                        {
+                            <div class="alert alert-info">
+                                No drivers yet. Add your first driver to get started.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Phone</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var driver in affiliate.Drivers)
+                                        {
+                                            <tr>
+                                                <td>@driver.Name</td>
+                                                <td>@driver.Phone</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-secondary">
+                                                        Edit
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger ms-2">
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public string AffiliateId { get; set; } = string.Empty;
+
+    private AffiliateDto? affiliate;
+    private bool isLoading = true;
+    private bool showAddForm = false;
+    private bool isSavingDriver = false;
+    
+    private string newDriverName = string.Empty;
+    private string newDriverPhone = string.Empty;
+    
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAffiliateAsync();
+    }
+
+    private async Task LoadAffiliateAsync()
+    {
+        isLoading = true;
+        try
+        {
+            affiliate = await AffiliateService.GetAffiliateAsync(AffiliateId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load affiliate: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowAddDriverForm()
+    {
+        showAddForm = true;
+        newDriverName = string.Empty;
+        newDriverPhone = string.Empty;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CancelAddForm()
+    {
+        showAddForm = false;
+        newDriverName = string.Empty;
+        newDriverPhone = string.Empty;
+    }
+
+    private async Task SaveDriver()
+    {
+        if (string.IsNullOrWhiteSpace(newDriverName) || string.IsNullOrWhiteSpace(newDriverPhone))
+        {
+            errorMessage = "Please fill in both driver name and phone.";
+            return;
+        }
+
+        isSavingDriver = true;
+        errorMessage = null;
+
+        try
+        {
+            var newDriver = new DriverDto
+            {
+                AffiliateId = AffiliateId,
+                Name = newDriverName,
+                Phone = newDriverPhone
+            };
+
+            var driverId = await AffiliateService.AddDriverToAffiliateAsync(AffiliateId, newDriver);
+            newDriver.Id = driverId;
+
+            // Add to local state
+            affiliate?.Drivers.Add(newDriver);
+
+            successMessage = $"Driver '{newDriverName}' added successfully!";
+            CancelAddForm();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add driver: {ex.Message}";
+        }
+        finally
+        {
+            isSavingDriver = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/affiliates");
+    }
+}
