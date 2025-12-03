@@ -75,7 +75,20 @@ public class AffiliateService : IAffiliateService
     public async Task<string> CreateAffiliateAsync(AffiliateDto affiliate)
     {
         var client = await GetAuthorizedClientAsync();
-        var response = await client.PostAsJsonAsync("/affiliates", affiliate);
+        
+        // Send only affiliate properties, not drivers (they're managed separately)
+        var createDto = new
+        {
+            name = affiliate.Name,
+            pointOfContact = affiliate.PointOfContact,
+            phone = affiliate.Phone,
+            email = affiliate.Email,
+            streetAddress = affiliate.StreetAddress,
+            city = affiliate.City,
+            state = affiliate.State
+        };
+        
+        var response = await client.PostAsJsonAsync("/affiliates", createDto);
         response.EnsureSuccessStatusCode();
         
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
@@ -85,7 +98,20 @@ public class AffiliateService : IAffiliateService
     public async Task UpdateAffiliateAsync(string id, AffiliateDto affiliate)
     {
         var client = await GetAuthorizedClientAsync();
-        var response = await client.PutAsJsonAsync($"/affiliates/{id}", affiliate);
+        
+        // Send only affiliate properties, not drivers (they're managed separately)
+        var updateDto = new
+        {
+            name = affiliate.Name,
+            pointOfContact = affiliate.PointOfContact,
+            phone = affiliate.Phone,
+            email = affiliate.Email,
+            streetAddress = affiliate.StreetAddress,
+            city = affiliate.City,
+            state = affiliate.State
+        };
+        
+        var response = await client.PutAsJsonAsync($"/affiliates/{id}", updateDto);
         response.EnsureSuccessStatusCode();
     }
 

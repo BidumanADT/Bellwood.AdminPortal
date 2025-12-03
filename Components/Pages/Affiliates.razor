@@ -249,7 +249,10 @@
 
     private void ShowCreateForm()
     {
-        formModel = new AffiliateDto();
+        formModel = new AffiliateDto
+        {
+            Drivers = new List<DriverDto>() // Ensure drivers list is initialized
+        };
         editingAffiliateId = null;
         showForm = true;
         successMessage = null;
@@ -267,7 +270,8 @@
             Email = affiliate.Email,
             StreetAddress = affiliate.StreetAddress,
             City = affiliate.City,
-            State = affiliate.State
+            State = affiliate.State,
+            Drivers = new List<DriverDto>(affiliate.Drivers) // Copy drivers list
         };
         editingAffiliateId = affiliate.Id;
         showForm = true;
@@ -278,7 +282,7 @@
     private void CancelForm()
     {
         showForm = false;
-        formModel = new();
+        formModel = new AffiliateDto { Drivers = new List<DriverDto>() };
         editingAffiliateId = null;
     }
 
