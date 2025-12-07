@@ -125,8 +125,22 @@ public class AffiliateService : IAffiliateService
     public async Task<string> AddDriverToAffiliateAsync(string affiliateId, DriverDto driver)
     {
         var client = await GetAuthorizedClientAsync();
-        var response = await client.PostAsJsonAsync($"/affiliates/{affiliateId}/drivers", driver);
-        response.EnsureSuccessStatusCode();
+        
+        // Send driver data including UserUid for AuthServer identity linking
+        var driverPayload = new
+        {
+            name = driver.Name,
+            phone = driver.Phone,
+            userUid = driver.UserUid
+        };
+        
+        var response = await client.PostAsJsonAsync($"/affiliates/{affiliateId}/drivers", driverPayload);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed to add driver: {response.StatusCode}. {errorContent}");
+        }
         
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
         return result?["id"] ?? throw new Exception("No ID returned from driver creation");

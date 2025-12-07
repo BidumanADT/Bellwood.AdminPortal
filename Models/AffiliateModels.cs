@@ -25,4 +25,12 @@ public class DriverDto
     public string AffiliateId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// The driver's AuthServer User UID (e.g., "driver-001"). 
+    /// This links the driver record to their authentication identity,
+    /// enabling the driver to see assigned rides in the driver app.
+    /// Optional but recommended for active drivers.
+    /// </summary>
+    public string? UserUid { get; set; }
 }

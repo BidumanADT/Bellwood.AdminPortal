@@ -247,5 +247,10 @@
         // Driver assignment fields
         public string? AssignedDriverId { get; set; }
         public string? AssignedDriverName { get; set; }
+        /// <summary>
+        /// The assigned driver's AuthServer UID. Useful for admin debugging 
+        /// to verify the driver can see this booking in the driver app.
+        /// </summary>
+        public string? AssignedDriverUid { get; set; }
     }
 }

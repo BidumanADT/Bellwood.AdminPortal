@@ -110,6 +110,16 @@
                                     else
                                     {
                                         <span class="text-success ms-2">? @booking.AssignedDriverName</span>
+                                        @if (!string.IsNullOrEmpty(booking.AssignedDriverUid))
+                                        {
+                                            <br/>
+                                            <small class="text-muted">UID: @booking.AssignedDriverUid</small>
+                                        }
+                                        else if (!string.IsNullOrEmpty(booking.AssignedDriverId))
+                                        {
+                                            <br/>
+                                            <small class="text-warning">?? Driver not linked to AuthServer - won't see this ride in driver app</small>
+                                        }
                                     }
                                 </div>
 
@@ -180,8 +190,25 @@
                                                                 <div class="list-group-item" style="background: transparent; border-color: rgba(203, 161, 53, 0.2);">
                                                                     <div class="d-flex justify-content-between align-items-center">
                                                                         <div>
-                                                                            <strong>@driver.Name</strong><br/>
+                                                                            <strong>@driver.Name</strong>
+                                                                            @if (string.IsNullOrEmpty(driver.UserUid))
+                                                                            {
+                                                                                <span class="badge bg-warning text-dark ms-2" title="Driver won't see assigned rides">
+                                                                                    Not linked
+                                                                                </span>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <span class="badge bg-success ms-2" title="Driver is linked to AuthServer">
+                                                                                    Linked
+                                                                                </span>
+                                                                            }
+                                                                            <br/>
                                                                             <small class="text-muted">@driver.Phone</small>
+                                                                            @if (!string.IsNullOrEmpty(driver.UserUid))
+                                                                            {
+                                                                                <small class="text-muted"> • UID: @driver.UserUid</small>
+                                                                            }
                                                                         </div>
                                                                         <button class="btn btn-sm btn-primary" 
                                                                                 @onclick="() => AssignDriver(driver)"
@@ -208,13 +235,21 @@
                                                             <h6>Add New Driver</h6>
                                                             <div class="mb-2">
                                                                 <input type="text" class="form-control form-control-sm" 
-                                                                       placeholder="Driver Name" 
+                                                                       placeholder="Driver Name *" 
                                                                        @bind="newDriverName" />
                                                             </div>
                                                             <div class="mb-2">
                                                                 <input type="text" class="form-control form-control-sm" 
-                                                                       placeholder="Driver Phone" 
+                                                                       placeholder="Driver Phone *" 
                                                                        @bind="newDriverPhone" />
+                                                            </div>
+                                                            <div class="mb-2">
+                                                                <input type="text" class="form-control form-control-sm" 
+                                                                       placeholder="User UID (e.g., driver-001)" 
+                                                                       @bind="newDriverUserUid" />
+                                                                <small class="form-text text-muted">
+                                                                    Enter the driver's AuthServer UID to enable ride visibility in driver app.
+                                                                </small>
                                                             </div>
                                                             <div class="d-flex gap-2">
                                                                 <button class="btn btn-sm btn-success" 
@@ -280,6 +315,7 @@
     private string? addDriverAffiliateId;
     private string newDriverName = string.Empty;
     private string newDriverPhone = string.Empty;
+    private string? newDriverUserUid;
     
     private string? successMessage;
     private string? errorMessage;
@@ -366,9 +402,13 @@
             {
                 booking.AssignedDriverId = driver.Id;
                 booking.AssignedDriverName = driver.Name;
+                booking.AssignedDriverUid = driver.UserUid;
             }
             
-            successMessage = $"? Driver assigned successfully! {driver.Name} will handle this booking. Affiliate has been notified via email.";
+            var warningMessage = string.IsNullOrEmpty(driver.UserUid) 
+                ? " ?? Note: Driver is not linked to AuthServer and won't see this ride in the driver app."
+                : "";
+            successMessage = $"? Driver assigned successfully! {driver.Name} will handle this booking. Affiliate has been notified via email.{warningMessage}";
         }
         catch (Exception ex)
         {
@@ -387,6 +427,7 @@
         addDriverAffiliateId = affiliateId;
         newDriverName = string.Empty;
         newDriverPhone = string.Empty;
+        newDriverUserUid = null;
     }
 
     private void CancelAddDriver()
@@ -395,6 +436,7 @@
         addDriverAffiliateId = null;
         newDriverName = string.Empty;
         newDriverPhone = string.Empty;
+        newDriverUserUid = null;
     }
 
     private async Task SaveNewDriver(string affiliateId)
@@ -414,7 +456,8 @@
             {
                 AffiliateId = affiliateId,
                 Name = newDriverName,
-                Phone = newDriverPhone
+                Phone = newDriverPhone,
+                UserUid = string.IsNullOrWhiteSpace(newDriverUserUid) ? null : newDriverUserUid.Trim()
             };
 
             var driverId = await AffiliateService.AddDriverToAffiliateAsync(affiliateId, newDriver);
@@ -428,7 +471,10 @@
             }
 
             CancelAddDriver();
-            successMessage = "Driver added successfully!";
+            var linkedMessage = string.IsNullOrEmpty(newDriver.UserUid) 
+                ? " (Note: Driver is not linked to AuthServer)"
+                : $" (Linked to UID: {newDriver.UserUid})";
+            successMessage = $"Driver added successfully!{linkedMessage}";
         }
         catch (Exception ex)
         {
@@ -458,5 +504,10 @@
         public DateTime PickupDateTime { get; set; }
         public string? AssignedDriverId { get; set; }
         public string? AssignedDriverName { get; set; }
+        /// <summary>
+        /// The assigned driver's AuthServer UID. Used for admin debugging 
+        /// to verify the driver can see this booking in the driver app.
+        /// </summary>
+        public string? AssignedDriverUid { get; set; }
     }
 }
