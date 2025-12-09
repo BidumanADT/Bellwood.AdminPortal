@@ -12,7 +12,14 @@
                 <div class="col-lg-10">
                     <!-- Header -->
                     <div class="text-center mb-5">
-                        <h1 class="display-4 text-bellwood-gold">🚕 Bellwood Elite</h1>
+                        <div class="mb-4">
+                            <img src="/images/bellwood_elite_icon.png" 
+                                 alt="Bellwood Elite" 
+                                 style="width: 120px; height: 120px; object-fit: contain;"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                            <span class="display-3" style="display: none;">🚕</span>
+                        </div>
+                        <h1 class="display-4 text-bellwood-gold">Bellwood Elite</h1>
                         <h2 class="h3 text-muted">Admin Portal</h2>
                         <p class="lead">Welcome, @context.User.Identity?.Name!</p>
                     </div>
@@ -42,7 +49,7 @@
                             <div class="card h-100 shadow-sm hover-card" style="cursor: pointer;" @onclick="NavigateToQuotes">
                                 <div class="card-body text-center p-4">
                                     <div class="mb-3">
-                                        <span class="display-3">💰</span>
+                                        <span class="display-3">📄</span>
                                     </div>
                                     <h3 class="card-title h4 mb-3">Quotes</h3>
                                     <p class="card-text text-muted">
