@@ -9,6 +9,7 @@
 @inject IAuthTokenProvider TokenProvider
 @inject IAdminApiKeyProvider ApiKeyProvider
 @inject IAffiliateService AffiliateService
+@inject IDriverTrackingService TrackingService
 @inject NavigationManager Navigation
 
 <PageTitle>Booking Detail - Bellwood Elite</PageTitle>
@@ -92,6 +93,71 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Live Tracking Card (shown for active rides) -->
+                        @if (IsTrackableStatus(booking.Status))
+                        {
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <h4 class="card-title mb-3">??? Live Tracking</h4>
+                                    
+                                    @if (driverLocation != null)
+                                    {
+                                        <div class="mb-3 p-3" style="background: rgba(40, 167, 69, 0.1); border-radius: 8px; border-left: 3px solid #28a745;">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong class="text-success">?? Driver Location Active</strong>
+                                                    <br />
+                                                    <small class="text-muted">
+                                                        Last update: @driverLocation.Timestamp.ToLocalTime().ToString("g")
+                                                        (@GetTimeAgo(driverLocation.Timestamp))
+                                                    </small>
+                                                </div>
+                                                @if (driverLocation.Speed.HasValue)
+                                                {
+                                                    <div class="text-end">
+                                                        <span class="badge bg-info">
+                                                            @($"{driverLocation.Speed.Value * 2.237:F0} mph")
+                                                        </span>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    Coordinates: @driverLocation.Latitude.ToString("F6"), @driverLocation.Longitude.ToString("F6")
+                                                </small>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (isLoadingLocation)
+                                    {
+                                        <div class="text-center py-2">
+                                            <div class="spinner-border spinner-border-sm text-bellwood-gold"></div>
+                                            <span class="ms-2">Checking driver location...</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="mb-3 p-3" style="background: rgba(108, 117, 125, 0.1); border-radius: 8px;">
+                                            <span class="text-muted">?? No location data available yet.</span>
+                                            <br />
+                                            <small class="text-muted">
+                                                Location will appear once the driver starts sharing their position.
+                                            </small>
+                                        </div>
+                                    }
+
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary" @onclick="ViewOnMap">
+                                            ??? View on Live Map
+                                        </button>
+                                        <button class="btn btn-outline-secondary" @onclick="RefreshLocation">
+                                            ?? Refresh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
 
                     <!-- Driver Assignment Card -->
@@ -304,9 +370,11 @@
     private BookingInfo? booking;
     private List<AffiliateDto> affiliates = new();
     private HashSet<string> expandedAffiliates = new();
+    private LocationResponse? driverLocation;
     
     private bool isLoading = true;
     private bool isLoadingAffiliates = false;
+    private bool isLoadingLocation = false;
     private bool isAssigning = false;
     private bool isAddingDriver = false;
     private bool showAddDriverForm = false;
@@ -324,6 +392,12 @@
     {
         await LoadBookingAsync();
         await LoadAffiliatesAsync();
+        
+        // Load driver location for trackable rides
+        if (booking != null && IsTrackableStatus(booking.Status))
+        {
+            await LoadDriverLocationAsync();
+        }
     }
 
     private async Task LoadBookingAsync()
@@ -372,6 +446,48 @@
         {
             isLoadingAffiliates = false;
         }
+    }
+
+    private async Task LoadDriverLocationAsync()
+    {
+        isLoadingLocation = true;
+        try
+        {
+            driverLocation = await TrackingService.GetRideLocationAsync(BookingId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load driver location: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingLocation = false;
+        }
+    }
+
+    private async Task RefreshLocation()
+    {
+        await LoadDriverLocationAsync();
+    }
+
+    private void ViewOnMap()
+    {
+        Navigation.NavigateTo("/tracking");
+    }
+
+    private bool IsTrackableStatus(string? status)
+    {
+        if (string.IsNullOrEmpty(status)) return false;
+        var trackableStatuses = new[] { "OnRoute", "Arrived", "PassengerOnboard", "Confirmed" };
+        return trackableStatuses.Contains(status, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private string GetTimeAgo(DateTime timestamp)
+    {
+        var age = DateTime.UtcNow - timestamp;
+        if (age.TotalSeconds < 60) return "just now";
+        if (age.TotalMinutes < 60) return $"{(int)age.TotalMinutes}m ago";
+        return $"{(int)age.TotalHours}h ago";
     }
 
     private void ToggleAffiliate(string affiliateId)

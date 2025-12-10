@@ -1,0 +1,504 @@
+@page "/tracking"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@inject IDriverTrackingService TrackingService
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Live Driver Tracking - Bellwood Elite</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="text-bellwood-gold mb-0">??? Live Driver Tracking</h2>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="connection-status @(isConnected ? "connected" : "disconnected")">
+                                @if (isConnected)
+                                {
+                                    <span>?? Real-time Connected</span>
+                                }
+                                else
+                                {
+                                    <span>?? Polling Mode</span>
+                                }
+                            </span>
+                            <button class="btn btn-primary btn-sm" @onclick="RefreshLocations">
+                                ?? Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            <div class="row">
+                <!-- Map Container -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div id="tracking-map" style="height: 600px; width: 100%; border-radius: 8px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Rides Sidebar -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <span class="me-2">??</span>
+                                Active Rides (@activeLocations.Count)
+                            </h5>
+                        </div>
+                        <div class="card-body p-0" style="max-height: 550px; overflow-y: auto;">
+                            @if (isLoading)
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-bellwood-gold" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (!activeLocations.Any())
+                            {
+                                <div class="text-center py-4 text-muted">
+                                    <span style="font-size: 2rem;">??</span>
+                                    <p class="mt-2 mb-0">No active drivers currently on trips.</p>
+                                    <small>Drivers will appear here when they start a ride.</small>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="list-group list-group-flush">
+                                    @foreach (var location in activeLocations.OrderByDescending(l => l.Timestamp))
+                                    {
+                                        <div class="list-group-item list-group-item-action @(selectedRideId == location.RideId ? "active-ride" : "")"
+                                             style="cursor: pointer; background: transparent; border-color: rgba(203, 161, 53, 0.2);"
+                                             @onclick="() => SelectRide(location)">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <h6 class="mb-1 text-bellwood-gold">
+                                                        ?? @(location.DriverName ?? "Unknown Driver")
+                                                    </h6>
+                                                    <p class="mb-1 small">
+                                                        <strong>Passenger:</strong> @(location.PassengerName ?? "N/A")
+                                                    </p>
+                                                    @if (!string.IsNullOrEmpty(location.PickupLocation))
+                                                    {
+                                                        <p class="mb-1 small text-truncate" style="max-width: 250px;" title="@location.PickupLocation">
+                                                            ?? @location.PickupLocation
+                                                        </p>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(location.DropoffLocation))
+                                                    {
+                                                        <p class="mb-0 small text-truncate" style="max-width: 250px;" title="@location.DropoffLocation">
+                                                            ?? @location.DropoffLocation
+                                                        </p>
+                                                    }
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge @GetStatusBadgeClass(location.Status)">
+                                                        @location.Status
+                                                    </span>
+                                                    <br />
+                                                    <small class="text-muted">
+                                                        @GetTimeAgo(location.Timestamp)
+                                                    </small>
+                                                    @if (location.Speed.HasValue)
+                                                    {
+                                                        <br />
+                                                        <small class="text-muted">
+                                                            @($"{location.Speed.Value * 2.237:F0} mph")
+                                                        </small>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Selected Ride Details -->
+                    @if (selectedRide != null)
+                    {
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Selected Ride Details</h6>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => selectedRide = null">×</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>Driver:</strong> @selectedRide.DriverName
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Passenger:</strong> @selectedRide.PassengerName
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Status:</strong> 
+                                    <span class="badge @GetStatusBadgeClass(selectedRide.Status)">@selectedRide.Status</span>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Coordinates:</strong>
+                                    <br />
+                                    <small class="text-muted">
+                                        @selectedRide.Latitude.ToString("F6"), @selectedRide.Longitude.ToString("F6")
+                                    </small>
+                                </div>
+                                @if (selectedRide.Heading.HasValue)
+                                {
+                                    <div class="mb-2">
+                                        <strong>Heading:</strong> @GetHeadingDirection(selectedRide.Heading.Value)
+                                    </div>
+                                }
+                                @if (selectedRide.Speed.HasValue)
+                                {
+                                    <div class="mb-2">
+                                        <strong>Speed:</strong> @($"{selectedRide.Speed.Value * 2.237:F1} mph")
+                                    </div>
+                                }
+                                <div class="mb-3">
+                                    <strong>Last Update:</strong> @selectedRide.Timestamp.ToLocalTime().ToString("g")
+                                </div>
+                                <button class="btn btn-primary btn-sm w-100" @onclick="() => ViewBookingDetails(selectedRide.RideId)">
+                                    ?? View Booking Details
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+<style>
+    .connection-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+    }
+    .connection-status.connected {
+        background: rgba(40, 167, 69, 0.2);
+        color: #28a745;
+    }
+    .connection-status.disconnected {
+        background: rgba(220, 53, 69, 0.2);
+        color: #dc3545;
+    }
+    .active-ride {
+        background: rgba(203, 161, 53, 0.15) !important;
+        border-left: 3px solid var(--bellwood-gold) !important;
+    }
+    .list-group-item:hover {
+        background: rgba(203, 161, 53, 0.1) !important;
+    }
+</style>
+
+@code {
+    private List<ActiveRideLocationDto> activeLocations = new();
+    private ActiveRideLocationDto? selectedRide;
+    private string? selectedRideId;
+    private bool isLoading = true;
+    private bool isConnected = false;
+    private string? errorMessage;
+    private bool mapInitialized = false;
+    private System.Timers.Timer? pollingTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Subscribe to tracking service events
+        TrackingService.LocationUpdated += OnLocationUpdated;
+        TrackingService.TrackingStopped += OnTrackingStopped;
+        TrackingService.ConnectionStateChanged += OnConnectionStateChanged;
+
+        // Load initial data
+        await LoadActiveLocationsAsync();
+
+        // Try to connect to SignalR
+        await TrackingService.ConnectAsync();
+        isConnected = TrackingService.IsConnected;
+
+        // Set up polling fallback if SignalR isn't connected
+        if (!isConnected)
+        {
+            StartPolling();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeMapAsync();
+        }
+    }
+
+    private async Task InitializeMapAsync()
+    {
+        try
+        {
+            var apiKey = Configuration["GoogleMaps:ApiKey"] ?? "";
+            await JS.InvokeVoidAsync("initTrackingMap", "tracking-map", apiKey);
+            mapInitialized = true;
+            
+            // Update markers with current data
+            await UpdateMapMarkersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to initialize map: {ex.Message}");
+            errorMessage = "Failed to load map. Please refresh the page.";
+        }
+    }
+
+    private async Task LoadActiveLocationsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            activeLocations = await TrackingService.GetAllActiveLocationsAsync();
+            
+            if (mapInitialized)
+            {
+                await UpdateMapMarkersAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load active locations: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshLocations()
+    {
+        await LoadActiveLocationsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void StartPolling()
+    {
+        pollingTimer?.Stop();
+        pollingTimer?.Dispose();
+        
+        pollingTimer = new System.Timers.Timer(15000); // Poll every 15 seconds
+        pollingTimer.Elapsed += async (sender, args) =>
+        {
+            if (!TrackingService.IsConnected)
+            {
+                await LoadActiveLocationsAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        };
+        pollingTimer.Start();
+    }
+
+    private void StopPolling()
+    {
+        pollingTimer?.Stop();
+        pollingTimer?.Dispose();
+        pollingTimer = null;
+    }
+
+    private async void OnLocationUpdated(object? sender, LocationUpdate update)
+    {
+        await InvokeAsync(async () =>
+        {
+            // Update or add the location
+            var existing = activeLocations.FirstOrDefault(l => l.RideId == update.RideId);
+            if (existing != null)
+            {
+                existing.Latitude = update.Latitude;
+                existing.Longitude = update.Longitude;
+                existing.Timestamp = update.Timestamp;
+                existing.Heading = update.Heading;
+                existing.Speed = update.Speed;
+                existing.Accuracy = update.Accuracy;
+                existing.DriverName = update.DriverName ?? existing.DriverName;
+                existing.DriverUid = update.DriverUid ?? existing.DriverUid;
+
+                if (selectedRide?.RideId == update.RideId)
+                {
+                    selectedRide = existing;
+                }
+            }
+            else
+            {
+                // New ride - fetch full details
+                await LoadActiveLocationsAsync();
+            }
+
+            // Update map marker
+            if (mapInitialized)
+            {
+                await JS.InvokeVoidAsync("updateDriverMarker", update.RideId, update.Latitude, update.Longitude, 
+                    update.Heading, update.DriverName ?? "Driver");
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async void OnTrackingStopped(object? sender, TrackingStoppedEventArgs args)
+    {
+        await InvokeAsync(async () =>
+        {
+            var toRemove = activeLocations.FirstOrDefault(l => l.RideId == args.RideId);
+            if (toRemove != null)
+            {
+                activeLocations.Remove(toRemove);
+                
+                if (selectedRide?.RideId == args.RideId)
+                {
+                    selectedRide = null;
+                    selectedRideId = null;
+                }
+
+                if (mapInitialized)
+                {
+                    await JS.InvokeVoidAsync("removeDriverMarker", args.RideId);
+                }
+            }
+            StateHasChanged();
+        });
+    }
+
+    private void OnConnectionStateChanged(object? sender, bool connected)
+    {
+        InvokeAsync(() =>
+        {
+            isConnected = connected;
+            
+            if (connected)
+            {
+                StopPolling();
+            }
+            else
+            {
+                StartPolling();
+            }
+            
+            StateHasChanged();
+        });
+    }
+
+    private async Task SelectRide(ActiveRideLocationDto location)
+    {
+        selectedRide = location;
+        selectedRideId = location.RideId;
+
+        if (mapInitialized)
+        {
+            await JS.InvokeVoidAsync("centerMapOnMarker", location.RideId, location.Latitude, location.Longitude);
+        }
+    }
+
+    private void ViewBookingDetails(string rideId)
+    {
+        Navigation.NavigateTo($"/bookings/{rideId}");
+    }
+
+    private async Task UpdateMapMarkersAsync()
+    {
+        if (!mapInitialized) return;
+
+        try
+        {
+            // Clear existing markers
+            await JS.InvokeVoidAsync("clearAllMarkers");
+
+            // Add markers for each active location
+            foreach (var location in activeLocations)
+            {
+                await JS.InvokeVoidAsync("addDriverMarker", 
+                    location.RideId, 
+                    location.Latitude, 
+                    location.Longitude, 
+                    location.Heading,
+                    location.DriverName ?? "Driver",
+                    location.PassengerName ?? "",
+                    location.Status ?? "Unknown");
+            }
+
+            // Fit bounds to show all markers
+            if (activeLocations.Any())
+            {
+                await JS.InvokeVoidAsync("fitBoundsToMarkers");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to update map markers: {ex.Message}");
+        }
+    }
+
+    private string GetStatusBadgeClass(string? status) => status?.ToLower() switch
+    {
+        "onroute" => "bg-info",
+        "arrived" => "bg-warning text-dark",
+        "passengeronboard" => "bg-success",
+        "confirmed" => "bg-primary",
+        _ => "bg-secondary"
+    };
+
+    private string GetTimeAgo(DateTime timestamp)
+    {
+        var age = DateTime.UtcNow - timestamp;
+        if (age.TotalSeconds < 60) return "Just now";
+        if (age.TotalMinutes < 60) return $"{(int)age.TotalMinutes}m ago";
+        return $"{(int)age.TotalHours}h ago";
+    }
+
+    private string GetHeadingDirection(double heading)
+    {
+        var directions = new[] { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+        var index = (int)Math.Round(heading / 45) % 8;
+        return $"{directions[index]} ({heading:F0}°)";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        StopPolling();
+        
+        TrackingService.LocationUpdated -= OnLocationUpdated;
+        TrackingService.TrackingStopped -= OnTrackingStopped;
+        TrackingService.ConnectionStateChanged -= OnConnectionStateChanged;
+
+        if (mapInitialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("disposeTrackingMap");
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+    }
+}
