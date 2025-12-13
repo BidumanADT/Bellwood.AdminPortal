@@ -1,37 +1,173 @@
-# Bellwood Admin Portal - Setup & Usage Guide
+# Bellwood Admin Portal
+
+> Modern admin dashboard for managing bookings, quotes, affiliates, and real-time driver tracking for Bellwood Elite Transportation Services.
+
+---
 
 ## ?? Quick Start
 
 ### Prerequisites
 - .NET 8 SDK
-- Running AuthServer on `https://localhost:5001`
-- Running AdminAPI on `https://localhost:5206`
+- Running **AuthServer** on `https://localhost:5001`
+- Running **AdminAPI** on `https://localhost:5206`
 
-### 1. Seed Test Data
-
-First, seed the AdminAPI with test bookings:
-
-```powershell
-# PowerShell
-.\seed-admin-api.ps1
-
-# Or manually with curl
-curl -X POST https://localhost:5206/bookings/seed -k
-```
-
-### 2. Run the Portal
+### 1. Run the Portal
 
 ```bash
 dotnet run
 ```
 
-### 3. Login
+### 2. Login
 
 Navigate to `https://localhost:7257` and login with:
 - Username: `alice` / Password: `password`
 - Username: `bob` / Password: `password`
 
-## ?? Architecture Overview
+### 3. Seed Test Data (Optional)
+
+```powershell
+# Seed bookings
+.\seed-admin-api.ps1
+
+# Or manually
+curl -X POST https://localhost:5206/bookings/seed -k
+```
+
+---
+
+## ? Features
+
+### ?? Bookings Management
+- View all customer bookings in a sortable, filterable table
+- Search by passenger name, phone, or booking ID
+- Filter by status (Pending, Confirmed, Completed, Cancelled)
+- View detailed booking information including:
+  - Passenger details
+  - Pickup and dropoff locations
+  - Ride dates and times
+  - Assigned driver and affiliate
+  - Service type and vehicle requirements
+- Update booking statuses
+- Driver assignment workflow
+
+### ?? Quotes Management
+- Review incoming quote requests
+- Provide pricing estimates
+- Convert quotes to confirmed bookings
+- Track quote status (Pending, Sent, Accepted, Declined)
+
+### ?? Affiliates Management
+- Manage transportation affiliates and their driver fleets
+- Create, edit, and delete affiliate organizations
+- View affiliate contact information and addresses
+- Manage drivers associated with each affiliate
+- Assign drivers to bookings
+
+### ??? Live Driver Tracking
+- **Real-time map view** of all active drivers
+- **SignalR WebSocket** integration for instant location updates
+- **HTTP polling fallback** when WebSocket unavailable
+- Interactive Google Maps with custom car icons
+- Driver information cards showing:
+  - Current speed and heading
+  - Passenger name
+  - Pickup/dropoff locations
+  - Ride status (On Route, Arrived, Passenger On Board)
+  - Last update timestamp
+- Click-to-zoom on specific rides
+- Connection status indicator
+- Seamless integration with booking details
+
+### ?? Premium Design
+- Modern, responsive Bootstrap 5 UI
+- Bellwood Elite gold and black branding
+- Dark theme map styling
+- Mobile-friendly layouts
+- Intuitive navigation with sidebar menu
+
+---
+
+## ?? Project Structure
+
+```
+Bellwood.AdminPortal/
+??? Components/
+?   ??? App.razor                 # Root component with Router
+?   ??? Layout/
+?   ?   ??? MainLayout.razor      # Authenticated pages layout with sidebar
+?   ?   ??? EmptyLayout.razor     # Login/public pages layout
+?   ?   ??? NavMenu.razor         # Navigation sidebar
+?   ??? Pages/
+?       ??? Home.razor            # Root route (redirects based on auth)
+?       ??? Login.razor           # Login page with JWT authentication
+?       ??? Logout.razor          # Logout handler
+?       ??? Main.razor            # Dashboard landing page
+?       ??? Bookings.razor        # Bookings list with filters
+?       ??? BookingDetail.razor   # Individual booking details
+?       ??? Quotes.razor          # Quotes management
+?       ??? Affiliates.razor      # Affiliates list and management
+?       ??? AffiliateDetail.razor # Affiliate details with drivers
+?       ??? LiveTracking.razor    # Real-time driver tracking map
+??? Services/
+?   ??? IAuthTokenProvider.cs           # JWT token storage interface
+?   ??? AuthTokenProvider.cs            # In-memory token storage
+?   ??? IAdminApiKeyProvider.cs         # API key access interface
+?   ??? AdminApiKeyProvider.cs          # Reads API key from config
+?   ??? JwtAuthenticationStateProvider.cs # Blazor auth state management
+?   ??? IAffiliateService.cs            # Affiliate CRUD interface
+?   ??? AffiliateService.cs             # Affiliate HTTP client service
+?   ??? IDriverTrackingService.cs       # Driver tracking interface
+?   ??? DriverTrackingService.cs        # SignalR + REST tracking service
+??? Models/
+?   ??? BookingModels.cs          # Booking DTOs
+?   ??? AffiliateModels.cs        # Affiliate and Driver DTOs
+?   ??? DriverTrackingModels.cs   # Location and tracking DTOs
+??? wwwroot/
+?   ??? js/
+?   ?   ??? tracking-map.js       # Google Maps JavaScript interop
+?   ??? css/
+?       ??? bellwood.css          # Custom styling
+??? Program.cs                     # DI configuration & middleware
+??? appsettings.json              # Configuration
+??? Bellwood.AdminPortal.csproj   # Project file
+
+```
+
+---
+
+## ?? Configuration
+
+### appsettings.json
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AdminAPI": {
+    "BaseUrl": "https://localhost:5206",
+    "ApiKey": "dev-secret-123"
+  },
+  "GoogleMaps": {
+    "ApiKey": ""
+  }
+}
+```
+
+**Important Configuration Notes:**
+
+1. **AdminAPI.ApiKey**: Must match `Email:ApiKey` in AdminAPI's `appsettings.Development.json`
+2. **AdminAPI.BaseUrl**: Should point to your running AdminAPI instance
+3. **GoogleMaps.ApiKey**: Optional - required for live driver tracking map functionality
+   - Without API key: Map shows placeholder, sidebar still functions
+   - Get your API key from: https://console.cloud.google.com/
+
+---
+
+## ??? Architecture
 
 ### Authentication Flow
 
@@ -42,337 +178,223 @@ User ? Login.razor ? AuthServer (/api/auth/login)
        ?
    JwtAuthenticationStateProvider.MarkUserAsAuthenticatedAsync()
        ?
-   Token stored in AuthTokenProvider
+   Token stored in AuthTokenProvider (in-memory)
        ?
    Blazor AuthenticationState updated
        ?
-   Redirect to /bookings
+   Navigate to /main
 ```
 
-### Authorization Flow
+### API Communication
+
+All API calls to AdminAPI include:
+- **X-Admin-ApiKey** header (from configuration)
+- **Authorization: Bearer {token}** header (from AuthTokenProvider)
 
 ```
-Components/Pages/Bookings.razor
-    ?
-<AuthorizeView>
-    ?
-Checks AuthenticationStateProvider
-    ?
-If Authorized: Show bookings
-If Not: Redirect to /login
+Component ? HttpClient "AdminAPI" ? AdminAPI Endpoint
+                ?
+         Base URL: https://localhost:5206
+         Headers: X-Admin-ApiKey, Authorization
+                ?
+         AdminAPI validates both
+                ?
+         Returns JSON response
 ```
 
-### API Communication Flow
+### Real-Time Driver Tracking
 
 ```
-Bookings.razor ? LoadBookingsAsync()
-    ?
-HttpClient "AdminAPI" configured with:
-    - Base URL: https://localhost:5206
-    - X-Admin-ApiKey header (from appsettings)
-    - Bearer token (from AuthTokenProvider)
-    ?
-GET /bookings/list?take=100
-    ?
-AdminAPI validates API key
-    ?
-Returns JSON array of bookings
-    ?
-Displayed in UI with filters
+AdminAPI LocationHub (SignalR WebSocket)
+       ?
+DriverTrackingService (Blazor Server)
+  - Maintains WebSocket connection
+  - Handles automatic reconnection
+  - Fires events on location updates
+       ?
+LiveTracking.razor (UI Component)
+  - Subscribes to service events
+  - Updates map markers via JS Interop
+  - Refreshes ride list
+       ?
+tracking-map.js (JavaScript)
+  - Manages Google Maps instance
+  - Animates marker positions
+  - Handles user interactions
 ```
 
-## ?? Configuration
-
-### appsettings.Development.json
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AdminApi": {
-    "BaseUrl": "https://localhost:5206",
-    "ApiKey": "dev-secret-123"
-  }
-}
-```
-
-**Important**: The `ApiKey` must match the `Email:ApiKey` setting in your AdminAPI's `appsettings.Development.json`.
-
-## ?? Project Structure
-
-```
-Bellwood.AdminPortal/
-??? Components/
-?   ??? App.razor                    # Root component with Router
-?   ??? Layout/
-?   ?   ??? MainLayout.razor         # Authenticated pages layout
-?   ?   ??? EmptyLayout.razor        # Login/public pages layout
-?   ?   ??? NavMenu.razor            # Navigation sidebar
-?   ??? Pages/
-?       ??? Home.razor               # Root route (redirects based on auth)
-?       ??? Login.razor              # Login page (InteractiveServer)
-?       ??? Logout.razor             # Logout handler
-?       ??? Bookings.razor           # Main bookings dashboard
-??? Services/
-?   ??? IAuthTokenProvider.cs        # Interface for token storage
-?   ??? AuthTokenProvider.cs         # In-memory token storage
-?   ??? IAdminApiKeyProvider.cs      # Interface for API key access
-?   ??? AdminApiKeyProvider.cs       # Reads API key from config
-?   ??? JwtAuthenticationStateProvider.cs  # Blazor auth state management
-??? Program.cs                       # DI configuration & middleware
-??? appsettings.Development.json     # Development configuration
-```
-
-## ?? Key Components Explained
-
-### 1. JwtAuthenticationStateProvider
-
-This is the bridge between your login flow and Blazor's built-in authorization components (`<AuthorizeView>`, `<AuthorizeRouteView>`).
-
-**What it does:**
-- Stores the current user's authentication state
-- Notifies Blazor when auth state changes (login/logout)
-- Used by `<AuthorizeView>` to determine if user is authenticated
-
-### 2. AuthTokenProvider
-
-Simple in-memory storage for the JWT token received from AuthServer.
-
-**Usage:**
-```csharp
-await TokenProvider.SetTokenAsync(token);  // After login
-var token = await TokenProvider.GetTokenAsync();  // When calling APIs
-await TokenProvider.ClearTokenAsync();  // On logout
-```
-
-### 3. AdminApiKeyProvider
-
-Reads the API key from `appsettings.json` and provides it to components.
-
-**Why needed:**
-Your AdminAPI uses `X-Admin-ApiKey` header validation for dev/testing. This service provides that key to HTTP requests.
-
-### 4. Login.razor
-
-**Key aspects:**
-- `@rendermode InteractiveServer` - Required for interactive forms and `HttpContext` access
-- `@layout Layout.EmptyLayout` - Uses minimal layout without navigation
-- Updates **both** cookie auth (if needed later) and Blazor's auth state
-
-### 5. Bookings.razor
-
-**Key aspects:**
-- Wrapped in `<AuthorizeView>` for protection
-- Fetches data from AdminAPI using configured HttpClient
-- Includes API key and JWT token in requests
-- Implements filtering and search
-
-## ?? Future: OAuth 2.0 Integration with LimoAnywhere
-
-### Current State
-- ? JWT token flow from custom AuthServer
-- ? Token storage and attachment to API calls
-- ? Blazor authentication state management
-
-### Migration Path to OAuth 2.0
-
-When integrating with LimoAnywhere's OAuth 2.0:
-
-1. **Replace AuthServer calls** in `Login.razor`:
-   ```csharp
-   // Instead of:
-   var response = await client.PostAsJsonAsync("/api/auth/login", ...);
-   
-   // You'll initiate OAuth flow:
-   Navigation.NavigateTo($"https://api.limoanywhere.com/oauth/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code");
-   ```
-
-2. **Create OAuth Callback Handler**:
-   ```razor
-   @page "/oauth/callback"
-   // Exchange authorization code for access token
-   // Store token using AuthTokenProvider
-   // Update auth state via JwtAuthenticationStateProvider
-   ```
-
-3. **Token Refresh Logic**:
-   - Add refresh token storage to `AuthTokenProvider`
-   - Implement automatic token refresh before expiry
-   - Handle token refresh failures (re-login)
-
-4. **Update AdminAPI** (if it also uses LimoAnywhere):
-   - Switch from API key to validating LimoAnywhere JWT
-   - Or keep API key for internal calls, OAuth for LimoAnywhere data
-
-**No major refactoring needed** - The token provider pattern is already OAuth-ready!
-
-## ?? Troubleshooting
-
-### Blank Page After Login
-**Symptoms:** Page loads but shows blank screen or spinning dots
-
-**Causes & Solutions:**
-1. **AuthenticationState not updated**
-   - Verify `JwtAuthenticationStateProvider.MarkUserAsAuthenticatedAsync()` is called after login
-   - Check browser console for errors
-
-2. **AdminAPI not responding**
-   - Verify AdminAPI is running on `https://localhost:5206`
-   - Check browser Network tab for failed requests
-   - Look for CORS errors
-
-3. **No bookings in database**
-   - Run the seed script: `.\seed-admin-api.ps1`
-   - Or manually POST to `/bookings/seed`
-
-### API Key Issues
-**Symptoms:** 401 Unauthorized when fetching bookings
-
-**Solution:**
-- Verify `appsettings.Development.json` has correct API key
-- Ensure it matches AdminAPI's `Email:ApiKey` configuration
-- Check browser Network tab to see if header is being sent
-
-### Build Errors
-**Common issues:**
-1. Missing `@page` directive on routable components
-2. Missing `@rendermode` on interactive components  
-3. Missing `@using` statements for namespaces
-
-**Solution:** Run `dotnet build` and check error messages
-
-## ?? Testing the Complete Flow
-
-### 1. Verify All Services Running
-
-```bash
-# Terminal 1: AuthServer
-cd C:\Users\sgtad\source\repos\BellwoodAuthServer
-dotnet run
-# Should show: Now listening on: https://localhost:5001
-
-# Terminal 2: AdminAPI
-cd C:\Users\sgtad\source\repos\Bellwood.AdminApi
-dotnet run
-# Should show: Now listening on: https://localhost:5206
-
-# Terminal 3: Admin Portal
-cd C:\Users\sgtad\source\repos\Bellwood.AdminPortal
-dotnet run
-# Should show: Now listening on: https://localhost:7257
-```
-
-### 2. Seed Test Data
-
-```powershell
-.\seed-admin-api.ps1
-```
-
-Expected output:
-```json
-{"added":3}
-```
-
-### 3. Test Login Flow
-
-1. Navigate to `https://localhost:7257`
-2. Should redirect to `/login`
-3. Enter: `alice` / `password`
-4. Should redirect to `/bookings`
-5. Should see 3 test bookings displayed
-
-### 4. Verify API Calls (Browser DevTools)
-
-1. Open DevTools ? Network tab
-2. Filter by "Fetch/XHR"
-3. Look for request to `https://localhost:5206/bookings/list?take=100`
-4. Check request headers include:
-   - `X-Admin-ApiKey: dev-secret-123`
-   - `Authorization: Bearer <token>`
-5. Response should be JSON array of bookings
-
-## ?? Educational Notes
-
-### Why These Changes Were Needed
-
-#### 1. JSON Syntax Error
-**Issue:** Extra `{` on line 7 of `appsettings.Development.json`
-**Learning:** JSON requires strict formatting - every `{` needs a matching `}`, commas between properties
-
-#### 2. Missing Namespace
-**Issue:** `IAdminApiKeyProvider.cs` had no namespace declaration
-**Learning:** C# files need `namespace` declarations to organize code and avoid naming conflicts
-
-#### 3. Disconnected Auth State
-**Issue:** Login set cookie auth but didn't update Blazor's `AuthenticationStateProvider`
-**Learning:** In Blazor, `<AuthorizeView>` and routing authorization use `AuthenticationStateProvider`, not cookies. You must explicitly notify Blazor of auth state changes.
-
-#### 4. Non-Functional Authorize Attribute
-**Issue:** `[StaffAuthorize]` was just an empty marker class
-**Learning:** In Blazor, authorization is handled by:
-- `<AuthorizeView>` components for UI elements
-- `<AuthorizeRouteView>` for page-level protection
-- Custom attributes require implementing `IAuthorizationRequirement` and handlers
-
-#### 5. Missing Service Registration
-**Issue:** Services not registered in DI container
-**Learning:** All services must be registered in `Program.cs` using:
-- `AddScoped` - Per-user instance (e.g., auth state)
-- `AddSingleton` - Single instance for app lifetime (e.g., config)
-- `AddTransient` - New instance every injection
-
-### Blazor Render Modes (.NET 8)
-
-Understanding when to use each:
-
-| Mode | Use Case | Can Access HttpContext? | Interactive? |
-|------|----------|-------------------------|--------------|
-| None (Static SSR) | Static content | No | No |
-| InteractiveServer | Forms, real-time updates | Yes | Yes |
-| InteractiveWebAssembly | Offline capability | No | Yes |
-| InteractiveAuto | Best of both | Initially yes | Yes |
-
-**Your portal uses InteractiveServer** because:
-- Login needs `HttpContext` for cookies (future)
-- Real-time booking updates via SignalR
-- No need for offline capability
-
-## ?? Next Steps
-
-### Immediate
-- [x] Fix JSON configuration
-- [x] Implement proper authentication flow
-- [x] Connect to AdminAPI
-- [ ] Add loading states and error handling
-- [ ] Implement booking detail view
-
-### Short Term
-- [ ] Add booking status update functionality
-- [ ] Implement search and filtering improvements
-- [ ] Add pagination for large booking lists
-- [ ] Create dashboard with statistics
-
-### Long Term (OAuth 2.0 Migration)
-- [ ] Register OAuth application with LimoAnywhere
-- [ ] Implement OAuth 2.0 authorization code flow
-- [ ] Add token refresh logic
-- [ ] Implement secure token storage (encrypted)
-- [ ] Add role-based authorization from OAuth scopes
-
-## ?? Support
-
-If you encounter issues:
-
-1. Check browser console for JavaScript errors
-2. Check browser Network tab for failed API calls
-3. Check terminal output for server-side errors
-4. Verify all three services are running
-5. Verify configuration in `appsettings.Development.json` matches AdminAPI
+**Fallback Mode:** When SignalR disconnected, automatic HTTP polling every 15 seconds.
 
 ---
 
-**Built with ?? for Bellwood Elite**
+## ?? Key Components
+
+### 1. JwtAuthenticationStateProvider
+
+Bridge between login flow and Blazor's authorization system.
+
+**Responsibilities:**
+- Stores current user's authentication state
+- Notifies Blazor when auth state changes (login/logout)
+- Used by `<AuthorizeView>` to determine authentication status
+
+### 2. DriverTrackingService
+
+Manages real-time driver location tracking.
+
+**Key Features:**
+- SignalR WebSocket connection with auto-reconnect
+- HTTP polling fallback
+- Event-driven architecture for UI updates
+- Subscription management for specific rides or drivers
+
+**Events:**
+- `LocationUpdated` - New location data received
+- `TrackingStopped` - Ride completed or cancelled
+- `ConnectionStateChanged` - SignalR connection state changes
+
+### 3. AffiliateService
+
+Handles affiliate and driver management.
+
+**Operations:**
+- CRUD operations for affiliates
+- Driver fleet management
+- Affiliate-driver associations
+
+---
+
+## ?? NuGet Packages
+
+```xml
+<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
+<PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+```
+
+**?? Important:** SignalR.Client must be version 8.x (not 10.x) to avoid form submission conflicts with Blazor's antiforgery system.
+
+---
+
+## ?? Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Home.razor | Redirects to /main if authenticated, else /login |
+| `/login` | Login.razor | JWT authentication page |
+| `/logout` | Logout.razor | Clears auth state and redirects to login |
+| `/main` | Main.razor | Dashboard landing page |
+| `/bookings` | Bookings.razor | Bookings list with filters |
+| `/bookings/{id}` | BookingDetail.razor | Detailed booking view |
+| `/quotes` | Quotes.razor | Quote requests management |
+| `/affiliates` | Affiliates.razor | Affiliates management |
+| `/affiliates/{id}` | AffiliateDetail.razor | Affiliate details with drivers |
+| `/tracking` | LiveTracking.razor | Real-time driver tracking map |
+
+---
+
+## ?? Usage Guide
+
+### For Dispatchers
+
+**Managing Bookings:**
+1. Navigate to **Bookings** from sidebar
+2. Use filters to find specific bookings
+3. Click a booking to view full details
+4. Assign drivers using the "Assign Driver" button
+5. Update booking status as needed
+
+**Live Driver Tracking:**
+1. Navigate to **Live Tracking** from sidebar
+2. View all active drivers on the map
+3. Click a ride card to zoom to that driver
+4. Monitor driver speed, location, and status
+5. Click "View Booking Details" for full ride information
+
+**Managing Affiliates:**
+1. Navigate to **Affiliates** from sidebar
+2. Create new affiliates with "Create Affiliate" button
+3. Edit affiliate details by clicking the edit icon
+4. Manage drivers within each affiliate
+5. Delete affiliates (only if no active assignments)
+
+### For Administrators
+
+**System Monitoring:**
+- Green badge on Live Tracking = Real-time SignalR connected
+- Red badge = HTTP polling mode (check network/SignalR)
+- Configure Google Maps API key in appsettings.json for full map functionality
+
+---
+
+## ?? Future Enhancements
+
+### Planned Features
+- Route history playback with polylines
+- ETA calculations using speed data
+- Geofencing alerts for zone-based notifications
+- Driver-specific tracking across multiple rides
+- Heatmap view for location density
+- Export/reporting for BI tools
+- OAuth 2.0 integration with LimoAnywhere
+
+### OAuth 2.0 Migration Path
+
+When integrating with LimoAnywhere's OAuth 2.0:
+
+1. **Replace AuthServer calls** in Login.razor with OAuth authorization flow
+2. **Create OAuth callback handler** to exchange authorization code for access token
+3. **Update token storage** to handle refresh tokens
+4. **Implement token refresh logic** in AuthTokenProvider
+
+The current architecture is designed to support this migration with minimal changes.
+
+---
+
+## ?? Additional Documentation
+
+Detailed documentation available in the `Docs/` folder:
+
+- **[QUICK_START.md](Docs/QUICK_START.md)** - Getting started guide
+- **[ARCHITECTURE.md](Docs/ARCHITECTURE.md)** - System architecture details
+- **[DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md](Docs/DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md)** - Driver tracking implementation
+- **[DRIVER_ASSIGNMENT_IMPLEMENTATION.md](Docs/DRIVER_ASSIGNMENT_IMPLEMENTATION.md)** - Driver assignment workflow
+- **[PREMIUM_DESIGN_IMPLEMENTATION.md](Docs/PREMIUM_DESIGN_IMPLEMENTATION.md)** - UI/UX design guide
+- **[STAKEHOLDER_DEMO_GUIDE.md](Docs/STAKEHOLDER_DEMO_GUIDE.md)** - Demo preparation guide
+
+---
+
+## ?? Contributing
+
+### Development Workflow
+
+1. Create feature branch from `main`
+2. Implement features with tests
+3. Update documentation
+4. Submit pull request
+
+### Code Style
+
+- Follow C# naming conventions
+- Use meaningful variable names
+- Document public APIs with XML comments
+- Keep components focused and single-purpose
+
+---
+
+## ?? License
+
+© 2024 Bellwood Global, Inc. All rights reserved.
+
+---
+
+## ?? Support
+
+For issues or questions:
+- Check documentation in `Docs/` folder
+- Review console logs for detailed error messages
+- Verify AuthServer and AdminAPI are running
+- Ensure API keys and configuration are correct
+
+---
+
+**Built with ?? using .NET 8 and Blazor Server**

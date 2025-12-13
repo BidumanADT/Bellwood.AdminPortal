@@ -18,6 +18,9 @@ builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
 // Business services
 builder.Services.AddScoped<IAffiliateService, AffiliateService>();
 
+// Driver tracking service - scoped to allow per-circuit SignalR connections
+builder.Services.AddScoped<IDriverTrackingService, DriverTrackingService>();
+
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 
