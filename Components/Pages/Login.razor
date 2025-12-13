@@ -34,7 +34,7 @@
                         <div class="alert alert-danger">@errorMessage</div>
                     }
 
-                    <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+                    <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" data-enhance="false">
                         <div class="mb-3">
                             <label class="form-label">Username</label>
                             <InputText @bind-Value="loginModel.Username"
