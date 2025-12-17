@@ -56,9 +56,14 @@
                                 
                                 <div class="mb-3">
                                     <strong>Status:</strong>
-                                    <span class="status-chip status-@(booking.Status?.ToLower() ?? "requested")">
-                                        @booking.Status
+                                    <span class="status-chip status-@(booking.DisplayStatus.ToLower())">
+                                        @booking.DisplayStatus
                                     </span>
+                                    @if (!string.IsNullOrEmpty(booking.CurrentRideStatus) && booking.CurrentRideStatus != booking.Status)
+                                    {
+                                        <br />
+                                        <small class="text-muted">Booking Status: @booking.Status</small>
+                                    }
                                 </div>
 
                                 <div class="mb-3">
@@ -95,7 +100,7 @@
                         </div>
 
                         <!-- Live Tracking Card (shown for active rides) -->
-                        @if (IsTrackableStatus(booking.Status))
+                        @if (IsTrackable(booking))
                         {
                             <div class="card mt-3">
                                 <div class="card-body">
@@ -478,8 +483,28 @@
     private bool IsTrackableStatus(string? status)
     {
         if (string.IsNullOrEmpty(status)) return false;
-        var trackableStatuses = new[] { "OnRoute", "Arrived", "PassengerOnboard", "Confirmed" };
+        // Only OnRoute, Arrived, and PassengerOnboard are truly trackable
+        // Removed 'Confirmed' as that's before driver starts
+        var trackableStatuses = new[] { "OnRoute", "Arrived", "PassengerOnboard" };
         return trackableStatuses.Contains(status, StringComparer.OrdinalIgnoreCase);
+    }
+    
+    /// <summary>
+    /// Determines if the booking is in a trackable state.
+    /// Checks CurrentRideStatus first, then falls back to Status for InProgress.
+    /// </summary>
+    private bool IsTrackable(BookingInfo? booking)
+    {
+        if (booking == null) return false;
+        
+        // Check CurrentRideStatus first (real-time driver state)
+        if (!string.IsNullOrEmpty(booking.CurrentRideStatus))
+        {
+            return IsTrackableStatus(booking.CurrentRideStatus);
+        }
+        
+        // Fallback to BookingStatus for older bookings
+        return booking.Status?.Equals("InProgress", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private string GetTimeAgo(DateTime timestamp)
@@ -612,12 +637,18 @@
         public string Id { get; set; } = string.Empty;
         public DateTime CreatedUtc { get; set; }
         public string? Status { get; set; }
+        /// <summary>
+        /// Real-time driver status (OnRoute, Arrived, PassengerOnboard, etc.)
+        /// Takes precedence over Status for displaying current ride state.
+        /// </summary>
+        public string? CurrentRideStatus { get; set; }
         public string BookerName { get; set; } = string.Empty;
         public string PassengerName { get; set; } = string.Empty;
         public string VehicleClass { get; set; } = string.Empty;
         public string PickupLocation { get; set; } = string.Empty;
         public string? DropoffLocation { get; set; }
         public DateTime PickupDateTime { get; set; }
+        public DateTimeOffset? PickupDateTimeOffset { get; set; }  // New timezone-aware field
         public string? AssignedDriverId { get; set; }
         public string? AssignedDriverName { get; set; }
         /// <summary>
@@ -625,5 +656,10 @@
         /// to verify the driver can see this booking in the driver app.
         /// </summary>
         public string? AssignedDriverUid { get; set; }
+        
+        /// <summary>
+        /// Gets the display status - prefers CurrentRideStatus if set, otherwise falls back to Status
+        /// </summary>
+        public string DisplayStatus => CurrentRideStatus ?? Status ?? "Unknown";
     }
 }

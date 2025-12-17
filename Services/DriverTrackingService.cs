@@ -286,6 +286,11 @@ public class DriverTrackingService : IDriverTrackingService
             var client = await GetAuthorizedClientAsync();
             return await client.GetFromJsonAsync<LocationResponse>($"/driver/location/{rideId}");
         }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("Access denied to location for ride {RideId}. User may not have permission.", rideId);
+            return null;
+        }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             _logger.LogDebug("No location data found for ride {RideId}", rideId);
@@ -304,6 +309,11 @@ public class DriverTrackingService : IDriverTrackingService
         {
             var client = await GetAuthorizedClientAsync();
             return await client.GetFromJsonAsync<List<ActiveRideLocationDto>>("/admin/locations") ?? new();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("Access denied to admin locations endpoint. User may not have admin role.");
+            throw new UnauthorizedAccessException("You do not have permission to view location data. Admin role required.", ex);
         }
         catch (Exception ex)
         {

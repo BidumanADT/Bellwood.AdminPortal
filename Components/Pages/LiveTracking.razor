@@ -285,9 +285,15 @@
                 await UpdateMapMarkersAsync();
             }
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = $"Access Denied: {ex.Message}";
+            Console.WriteLine($"[LiveTracking] 403 Forbidden: {ex.Message}");
+        }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load active locations: {ex.Message}";
+            Console.WriteLine($"[LiveTracking] Error: {ex.Message}");
         }
         finally
         {
