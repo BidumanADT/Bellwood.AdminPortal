@@ -21,6 +21,11 @@ public interface IDriverTrackingService : IAsyncDisposable
     event EventHandler<TrackingStoppedEventArgs>? TrackingStopped;
     
     /// <summary>
+    /// Event fired when a ride's status changes (OnRoute, Arrived, etc.)
+    /// </summary>
+    event EventHandler<RideStatusChangedEvent>? RideStatusChanged;
+    
+    /// <summary>
     /// Event fired when connection state changes
     /// </summary>
     event EventHandler<bool>? ConnectionStateChanged;
@@ -99,6 +104,7 @@ public class DriverTrackingService : IDriverTrackingService
     
     public event EventHandler<LocationUpdate>? LocationUpdated;
     public event EventHandler<TrackingStoppedEventArgs>? TrackingStopped;
+    public event EventHandler<RideStatusChangedEvent>? RideStatusChanged;
     public event EventHandler<bool>? ConnectionStateChanged;
     
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
@@ -156,6 +162,7 @@ public class DriverTrackingService : IDriverTrackingService
             // Register event handlers
             _hubConnection.On<LocationUpdate>("LocationUpdate", OnLocationUpdate);
             _hubConnection.On<string, string>("TrackingStopped", OnTrackingStopped);
+            _hubConnection.On<RideStatusChangedEvent>("RideStatusChanged", OnRideStatusChanged);
             _hubConnection.On<string>("SubscriptionConfirmed", OnSubscriptionConfirmed);
             
             _hubConnection.Closed += OnHubClosed;
@@ -308,7 +315,18 @@ public class DriverTrackingService : IDriverTrackingService
         try
         {
             var client = await GetAuthorizedClientAsync();
-            return await client.GetFromJsonAsync<List<ActiveRideLocationDto>>("/admin/locations") ?? new();
+            
+            // API returns envelope format: { count, locations[], timestamp }
+            var envelope = await client.GetFromJsonAsync<LocationsResponse>("/admin/locations");
+            
+            if (envelope == null)
+            {
+                _logger.LogWarning("Received null response from /admin/locations endpoint");
+                return new();
+            }
+            
+            _logger.LogDebug("Loaded {Count} active locations from API", envelope.Count);
+            return envelope.Locations;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
@@ -361,6 +379,13 @@ public class DriverTrackingService : IDriverTrackingService
         _logger.LogDebug("Received location update for ride {RideId}: {Lat}, {Lng}", 
             update.RideId, update.Latitude, update.Longitude);
         LocationUpdated?.Invoke(this, update);
+    }
+    
+    private void OnRideStatusChanged(RideStatusChangedEvent evt)
+    {
+        _logger.LogInformation("Ride {RideId} status changed to {NewStatus} by {DriverName}", 
+            evt.RideId, evt.NewStatus, evt.DriverName);
+        RideStatusChanged?.Invoke(this, evt);
     }
     
     private void OnTrackingStopped(string rideId, string reason)
