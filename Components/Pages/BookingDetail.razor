@@ -11,6 +11,7 @@
 @inject IAffiliateService AffiliateService
 @inject IDriverTrackingService TrackingService
 @inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Booking Detail - Bellwood Elite</PageTitle>
 
@@ -395,11 +396,20 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Subscribe to real-time status updates
+        TrackingService.RideStatusChanged += OnRideStatusChanged;
+        
+        // Connect to SignalR if not already connected
+        if (!TrackingService.IsConnected)
+        {
+            await TrackingService.ConnectAsync();
+        }
+        
         await LoadBookingAsync();
         await LoadAffiliatesAsync();
         
         // Load driver location for trackable rides
-        if (booking != null && IsTrackableStatus(booking.Status))
+        if (booking != null && IsTrackable(booking))
         {
             await LoadDriverLocationAsync();
         }
@@ -661,5 +671,40 @@
         /// Gets the display status - prefers CurrentRideStatus if set, otherwise falls back to Status
         /// </summary>
         public string DisplayStatus => CurrentRideStatus ?? Status ?? "Unknown";
+    }
+    
+    /// <summary>
+    /// Handle real-time status updates from SignalR
+    /// </summary>
+    private async void OnRideStatusChanged(object? sender, RideStatusChangedEvent evt)
+    {
+        await InvokeAsync(async () =>
+        {
+            // Check if this event is for the booking we're viewing
+            if (booking != null && booking.Id == evt.RideId)
+            {
+                // Update the status
+                booking.CurrentRideStatus = evt.NewStatus;
+                
+                Console.WriteLine($"[BookingDetail] Ride {evt.RideId} status updated to {evt.NewStatus} by {evt.DriverName}");
+                
+                // If the ride just became trackable, load location data
+                if (IsTrackable(booking) && driverLocation == null)
+                {
+                    await LoadDriverLocationAsync();
+                }
+                
+                StateHasChanged();
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Clean up SignalR subscriptions
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        TrackingService.RideStatusChanged -= OnRideStatusChanged;
+        await ValueTask.CompletedTask;
     }
 }

@@ -3,11 +3,14 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using BellwoodGlobal.Core.Domain
 @using Bellwood.AdminPortal.Services
+@using Bellwood.AdminPortal.Models
 @using System.Net.Http.Headers
 @inject IHttpClientFactory HttpFactory
 @inject IAuthTokenProvider TokenProvider
 @inject IAdminApiKeyProvider ApiKeyProvider
+@inject IDriverTrackingService TrackingService
 @inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Bookings Dashboard - Bellwood Elite</PageTitle>
 
@@ -173,6 +176,16 @@
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("Bookings: OnInitializedAsync running");
+        
+        // Subscribe to real-time status updates
+        TrackingService.RideStatusChanged += OnRideStatusChanged;
+        
+        // Connect to SignalR if not already connected
+        if (!TrackingService.IsConnected)
+        {
+            await TrackingService.ConnectAsync();
+        }
+        
         await LoadBookingsAsync();
     }
 
@@ -334,5 +347,42 @@
         /// Gets the display status - prefers CurrentRideStatus if set, otherwise falls back to Status
         /// </summary>
         public string DisplayStatus => CurrentRideStatus ?? Status ?? "Unknown";
+    }
+    
+    /// <summary>
+    /// Handle real-time status updates from SignalR
+    /// </summary>
+    private async void OnRideStatusChanged(object? sender, RideStatusChangedEvent evt)
+    {
+        await InvokeAsync(() =>
+        {
+            // Find the booking in our list
+            var booking = allBookings.FirstOrDefault(b => b.Id == evt.RideId);
+            if (booking != null)
+            {
+                // Update the status
+                booking.CurrentRideStatus = evt.NewStatus;
+                
+                Console.WriteLine($"[Bookings] Ride {evt.RideId} status updated to {evt.NewStatus} by {evt.DriverName}");
+                
+                // Re-apply filters to update the displayed list
+                FilterBookings(selectedFilter);
+                
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"[Bookings] Received status update for unknown ride {evt.RideId}");
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Clean up SignalR subscriptions
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        TrackingService.RideStatusChanged -= OnRideStatusChanged;
+        await ValueTask.CompletedTask;
     }
 }
