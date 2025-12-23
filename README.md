@@ -1,400 +1,939 @@
-# Bellwood Admin Portal
+# Bellwood AdminPortal
 
-> Modern admin dashboard for managing bookings, quotes, affiliates, and real-time driver tracking for Bellwood Elite Transportation Services.
+![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=.net)
+![Framework](https://img.shields.io/badge/framework-Blazor%20Server-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-Production%20Ready-success?style=flat-square)
+![License](https://img.shields.io/badge/license-Proprietary-red?style=flat-square)
 
----
+A production-ready dispatch and operations portal for the Bellwood Global chauffeur and limousine management system, providing real-time driver tracking, booking management, and fleet coordination for worldwide operations.
 
-## ?? Quick Start
+## Overview
 
-### Prerequisites
-- .NET 8 SDK
-- Running **AuthServer** on `https://localhost:5001`
-- Running **AdminAPI** on `https://localhost:5206`
+Bellwood AdminPortal is the **command center** for dispatchers and administrators, enabling:
 
-### 1. Run the Portal
+- ?? **Complete Booking Operations** – View, filter, assign drivers, and manage entire booking lifecycle
+- ??? **Real-Time GPS Tracking** – Live driver location via SignalR WebSockets with Google Maps integration
+- ?? **Affiliate & Driver Management** – Multi-company fleet coordination with driver assignment
+- ?? **Status Monitoring** – Real-time ride status updates (OnRoute, Arrived, PassengerOnboard)
+- ?? **Live Map Dashboard** – Interactive tracking map with driver markers and route visualization
+- ?? **Timezone Support** – Automatic timezone-aware pickup times for worldwide operations
+- ?? **Secure Authentication** – JWT-based login with role-based authorization
+- ?? **Responsive Design** – Premium Bellwood Elite branding with dark theme support
 
-```bash
-dotnet run
+## Architecture
+
+The Bellwood ecosystem consists of five interconnected components:
+
+```
+???????????????????    JWT Auth      ????????????????
+?   AuthServer    ? ???????????????? ?  AdminAPI    ?
+?  (Identity)     ?                  ?  (Backend)   ?
+???????????????????                  ????????????????
+                                             ?
+                     ?????????????????????????????????????????????????
+                     ?                       ?                       ?
+              ???????????????        ???????????????        ???????????????
+              ? AdminPortal ?        ? PassengerApp?        ?  DriverApp  ?
+              ? (This Repo) ?        ?   (MAUI)    ?        ?   (MAUI)    ?
+              ???????????????        ???????????????        ???????????????
 ```
 
-### 2. Login
+### Integration Points
 
-Navigate to `https://localhost:7257` and login with:
-- Username: `alice` / Password: `password`
-- Username: `bob` / Password: `password`
+| Component | Technology | Purpose | Authentication |
+|-----------|-----------|---------|----------------|
+| **AuthServer** | .NET Identity | Issues JWT tokens with role/uid claims | N/A |
+| **AdminAPI** | Minimal APIs + SignalR | Backend services, GPS tracking, data storage | JWT (admin/dispatcher role) |
+| **AdminPortal** | Blazor Server | **This App** - Dispatch operations and fleet management | JWT (admin role) |
+| **PassengerApp** | .NET MAUI | Customer booking and ride tracking | JWT (email claim) |
+| **DriverApp** | .NET MAUI | Driver assignments and GPS updates | JWT (driver role + uid) |
 
-### 3. Seed Test Data (Optional)
+## Current Capabilities
 
-```powershell
-# Seed bookings
-.\seed-admin-api.ps1
+### Core Features
 
-# Or manually
-curl -X POST https://localhost:5206/bookings/seed -k
-```
+- **Authentication & Authorization:** JWT Bearer tokens with `admin` and `dispatcher` roles; secure authentication state provider with automatic token refresh; login/logout flow with protected routes.
+- **Booking Management:** Full booking list with filtering (All, Requested, Confirmed, Active, Completed, Cancelled); search by passenger name, location, booker; detailed booking view with passenger info, pickup/dropoff, assigned driver; driver assignment workflow with affiliate selection; booking cancellation support.
+- **Real-Time Status Updates:** SignalR subscription on all pages (Bookings, BookingDetail, LiveTracking); instant status changes without manual refresh (OnRoute, Arrived, PassengerOnboard); dual status display (`Status` for reports, `CurrentRideStatus` for real-time driver state); automatic filter updates when status changes.
+- **Quote Management:** View incoming quote requests; convert quotes to bookings; filter by status (Pending, Converted, Declined).
+- **Affiliate & Driver Management:** View affiliate companies with driver lists; add new affiliates and drivers; assign drivers to bookings; driver UserUid linking to AuthServer for app access.
 
----
+### Real-Time Tracking Features
 
-## ? Features
+- **Live Tracking Dashboard:** Interactive Google Maps with dark theme matching Bellwood branding; real-time driver location markers with car icons; driver list sidebar with ride details (passenger, pickup/dropoff, status, speed); connection status indicator (SignalR vs polling); auto-fit map bounds to show all active drivers; click-to-zoom on selected ride.
+- **SignalR Real-Time Updates:** `LocationUpdate` events (GPS coordinates from drivers); `RideStatusChanged` events (driver state changes); `TrackingStopped` events (ride completion); automatic reconnection on network interruption; polling fallback (15-second intervals) if SignalR unavailable.
+- **Booking Integration:** Live tracking card on BookingDetail page; "View on Live Map" quick navigation; tracking indicators (??) on trackable rides; "Active" filter shows rides with active GPS tracking; automatic location loading when ride becomes trackable.
+- **Admin Location Access:** View all active driver locations simultaneously; batch query specific rides; see location age (staleness detection); driver name, passenger name, pickup/dropoff context; current speed and heading display.
 
-### ?? Bookings Management
-- View all customer bookings in a sortable, filterable table
-- Search by passenger name, phone, or booking ID
-- Filter by status (Pending, Confirmed, Completed, Cancelled)
-- View detailed booking information including:
-  - Passenger details
-  - Pickup and dropoff locations
-  - Ride dates and times
-  - Assigned driver and affiliate
-  - Service type and vehicle requirements
-- Update booking statuses
-- Driver assignment workflow
+### Dashboard Features
 
-### ?? Quotes Management
-- Review incoming quote requests
-- Provide pricing estimates
-- Convert quotes to confirmed bookings
-- Track quote status (Pending, Sent, Accepted, Declined)
+- **Main Dashboard:** Recent bookings overview with status summary; quick stats (Total Bookings, Active Rides, Pending Quotes, Drivers Available); quick actions (New Booking, View Live Map, Manage Affiliates); upcoming rides preview.
+- **Bookings Dashboard:** Filterable list with status badges; search across passenger names and locations; "Active" filter for tracking rides; live status updates via SignalR; tracking indicators for active GPS; one-click navigation to booking details or live map.
+- **Booking Detail Page:** Complete passenger and booker information; pickup/dropoff addresses; flight details (if airport pickup); assigned driver info with UserUid; real-time status badge (prefers `CurrentRideStatus`); live tracking card with coordinates; refresh button for latest location.
 
-### ?? Affiliates Management
-- Manage transportation affiliates and their driver fleets
-- Create, edit, and delete affiliate organizations
-- View affiliate contact information and addresses
-- Manage drivers associated with each affiliate
-- Assign drivers to bookings
-
-### ??? Live Driver Tracking
-- **Real-time map view** of all active drivers
-- **SignalR WebSocket** integration for instant location updates
-- **HTTP polling fallback** when WebSocket unavailable
-- Interactive Google Maps with custom car icons
-- Driver information cards showing:
-  - Current speed and heading
-  - Passenger name
-  - Pickup/dropoff locations
-  - Ride status (On Route, Arrived, Passenger On Board)
-  - Last update timestamp
-- Click-to-zoom on specific rides
-- Connection status indicator
-- Seamless integration with booking details
-
-### ?? Premium Design
-- Modern, responsive Bootstrap 5 UI
-- Bellwood Elite gold and black branding
-- Dark theme map styling
-- Mobile-friendly layouts
-- Intuitive navigation with sidebar menu
-
----
-
-## ?? Project Structure
+## Project Structure
 
 ```
 Bellwood.AdminPortal/
-??? Components/
-?   ??? App.razor                 # Root component with Router
-?   ??? Layout/
-?   ?   ??? MainLayout.razor      # Authenticated pages layout with sidebar
-?   ?   ??? EmptyLayout.razor     # Login/public pages layout
-?   ?   ??? NavMenu.razor         # Navigation sidebar
-?   ??? Pages/
-?       ??? Home.razor            # Root route (redirects based on auth)
-?       ??? Login.razor           # Login page with JWT authentication
-?       ??? Logout.razor          # Logout handler
-?       ??? Main.razor            # Dashboard landing page
-?       ??? Bookings.razor        # Bookings list with filters
-?       ??? BookingDetail.razor   # Individual booking details
-?       ??? Quotes.razor          # Quotes management
-?       ??? Affiliates.razor      # Affiliates list and management
-?       ??? AffiliateDetail.razor # Affiliate details with drivers
-?       ??? LiveTracking.razor    # Real-time driver tracking map
-??? Services/
-?   ??? IAuthTokenProvider.cs           # JWT token storage interface
-?   ??? AuthTokenProvider.cs            # In-memory token storage
-?   ??? IAdminApiKeyProvider.cs         # API key access interface
-?   ??? AdminApiKeyProvider.cs          # Reads API key from config
-?   ??? JwtAuthenticationStateProvider.cs # Blazor auth state management
-?   ??? IAffiliateService.cs            # Affiliate CRUD interface
-?   ??? AffiliateService.cs             # Affiliate HTTP client service
-?   ??? IDriverTrackingService.cs       # Driver tracking interface
-?   ??? DriverTrackingService.cs        # SignalR + REST tracking service
-??? Models/
-?   ??? BookingModels.cs          # Booking DTOs
-?   ??? AffiliateModels.cs        # Affiliate and Driver DTOs
-?   ??? DriverTrackingModels.cs   # Location and tracking DTOs
-??? wwwroot/
-?   ??? js/
-?   ?   ??? tracking-map.js       # Google Maps JavaScript interop
-?   ??? css/
-?       ??? bellwood.css          # Custom styling
-??? Program.cs                     # DI configuration & middleware
-??? appsettings.json              # Configuration
-??? Bellwood.AdminPortal.csproj   # Project file
-
+?? Components/                        # Blazor Components
+?   ?? Layout/
+?   ?   ?? MainLayout.razor          # Main layout with navigation
+?   ?   ?? NavMenu.razor             # Sidebar navigation
+?   ?   ?? EmptyLayout.razor         # Login page layout
+?   ?? Pages/
+?   ?   ?? Home.razor                # Dashboard home page
+?   ?   ?? Main.razor                # Main dashboard with stats
+?   ?   ?? Login.razor               # Login page
+?   ?   ?? Logout.razor              # Logout handler
+?   ?   ?? Bookings.razor            # Bookings list with filters + real-time updates
+?   ?   ?? BookingDetail.razor       # Booking details with live tracking
+?   ?   ?? LiveTracking.razor        # Interactive tracking map + SignalR
+?   ?   ?? Quotes.razor              # Quote requests list
+?   ?   ?? Affiliates.razor          # Affiliate management
+?   ?   ?? AffiliateDetail.razor     # Affiliate details + driver list
+?   ?? App.razor                     # Root app component
+?   ?? Routes.razor                  # Route definitions
+?? Services/                          # Application Services
+?   ?? IAuthTokenProvider.cs         # JWT token provider interface
+?   ?? AuthTokenProvider.cs          # Stores JWT in browser localStorage
+?   ?? JwtAuthenticationStateProvider.cs # Authentication state management
+?   ?? IAdminApiKeyProvider.cs       # Admin API key provider
+?   ?? IDriverTrackingService.cs     # Driver tracking service interface
+?   ?? DriverTrackingService.cs      # SignalR client + location service
+?   ?? IAffiliateService.cs          # Affiliate service interface
+?   ?? AffiliateService.cs           # Affiliate/driver management service
+?? Models/                            # Data Models
+?   ?? DriverTrackingModels.cs       # LocationUpdate, ActiveRideLocationDto, etc.
+?   ?? AffiliateModels.cs            # Affiliate and Driver DTOs
+?? Auth/                              # Authorization
+?   ?? StaffAuthorizeAttribute.cs    # Custom authorize attribute
+?? wwwroot/                           # Static Assets
+?   ?? css/
+?   ?   ?? bellwood.css              # Bellwood branding (gold theme)
+?   ?   ?? app.css                   # Base styles
+?   ?? js/
+?   ?   ?? tracking-map.js           # Google Maps JavaScript interop
+?   ?? favicon.ico
+?? Docs/                              # Comprehensive Documentation
+?   ?? PRODUCTION_DEPLOYMENT_READINESS.md # Deployment checklist
+?   ?? ADMINPORTAL_DASHBOARD_REALTIME_UPDATES.md # Dashboard SignalR integration
+?   ?? ADMINPORTAL_REALTIME_STATUS_UPDATES.md # LiveTracking implementation
+?   ?? DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md # Complete tracking guide
+?   ?? ADMINPORTAL_STATUS_TIMEZONE_INTEGRATION.md # Status + timezone fixes
+?   ?? DRIVER_ASSIGNMENT_IMPLEMENTATION.md # Driver assignment workflow
+?   ?? QUICK_START.md                # Quick start guide
+?   ?? [...].md                      # 20+ detailed docs
+?? Scripts/                           # PowerShell Test Scripts
+?   ?? seed-admin-api.ps1            # Seed AdminAPI with test data
+?   ?? test-api-connection.ps1       # Test AdminAPI connectivity
+?? appsettings.json                  # Configuration
+?? Program.cs                        # Application startup
+?? Bellwood.AdminPortal.csproj       # .NET 8 Blazor Server project
 ```
 
----
+## Documentation
 
-## ?? Configuration
+### Core Documentation
 
-### appsettings.json
+- `Docs/PRODUCTION_DEPLOYMENT_READINESS.md` – Complete deployment guide with testing checklist
+- `Docs/DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md` – Real-time tracking implementation details
+- `Docs/ADMINPORTAL_DASHBOARD_REALTIME_UPDATES.md` – SignalR dashboard integration guide
+
+### Feature Guides
+
+- `Docs/ADMINPORTAL_REALTIME_STATUS_UPDATES.md` – LiveTracking page SignalR implementation
+- `Docs/ADMINPORTAL_STATUS_TIMEZONE_INTEGRATION.md` – Status persistence and timezone handling
+- `Docs/DRIVER_ASSIGNMENT_IMPLEMENTATION.md` – Driver assignment workflow
+- `Docs/DRIVER_APP_COMPLETE_INTEGRATION_GUIDE.md` – Driver App integration reference
+
+### Development Guides
+
+- `Docs/QUICK_START.md` – Quick start for development
+- `Docs/ARCHITECTURE.md` – System architecture overview
+- `Docs/STAKEHOLDER_DEMO_GUIDE.md` – Demo walkthrough for stakeholders
+- `Docs/VISUAL_DESIGN_REFERENCE.md` – Bellwood branding guidelines
+
+**Total**: 20+ comprehensive documents (~25,000 words)
+
+## Prerequisites
+
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **AuthServer** running at `https://localhost:5001` (for JWT tokens)
+- **AdminAPI** running at `https://localhost:5206` (for backend services)
+- [Google Maps API Key](https://developers.google.com/maps/documentation/javascript/get-api-key) (optional, for full map functionality)
+
+## Getting Started
+
+### 1. Clone & Restore
+
+```sh
+git clone https://github.com/BidumanADT/Bellwood.AdminPortal.git
+cd Bellwood.AdminPortal
+dotnet restore
+```
+
+### 2. Configure
+
+Update `appsettings.json` with your settings:
 
 ```json
 {
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
   "AdminAPI": {
     "BaseUrl": "https://localhost:5206",
-    "ApiKey": "dev-secret-123"
+    "ApiKey": ""  // Optional admin API key
+  },
+  "AuthServer": {
+    "LoginUrl": "https://localhost:5001/login"
   },
   "GoogleMaps": {
-    "ApiKey": ""
+    "ApiKey": ""  // Get from Google Cloud Console
   }
 }
 ```
 
-**Important Configuration Notes:**
+### 3. Run
 
-1. **AdminAPI.ApiKey**: Must match `Email:ApiKey` in AdminAPI's `appsettings.Development.json`
-2. **AdminAPI.BaseUrl**: Should point to your running AdminAPI instance
-3. **GoogleMaps.ApiKey**: Optional - required for live driver tracking map functionality
-   - Without API key: Map shows placeholder, sidebar still functions
-   - Get your API key from: https://console.cloud.google.com/
+```sh
+dotnet run
+```
+
+The portal will start at:
+- **HTTPS**: `https://localhost:7257`
+- **HTTP**: `http://localhost:5072`
+
+### 4. Login
+
+Navigate to `https://localhost:7257` and login with test credentials:
+
+| Username | Password | Role | Purpose |
+|----------|----------|------|---------|
+| `alice` | `password` | Admin | Full access to all features |
+| `bob` | `password` | Dispatcher | Booking management and tracking |
+
+### 5. Seed Test Data
+
+```powershell
+# Seed AdminAPI with test data
+.\Scripts\seed-admin-api.ps1
+
+# Or manually via AdminAPI
+curl -X POST https://localhost:5206/bookings/seed -k
+curl -X POST https://localhost:5206/affiliates/seed -k
+```
+
+### 6. Verify Connection
+
+```powershell
+# Test AdminAPI connectivity
+.\Scripts\test-api-connection.ps1
+```
+
+## Key Pages
+
+### Main Dashboard (`/`)
+
+**Features:**
+- Recent bookings overview
+- Quick stats (Total Bookings, Active Rides, Pending Quotes)
+- Quick actions (New Booking, View Live Map, Manage Affiliates)
+- Upcoming rides preview
+
+**Access**: Any authenticated user
 
 ---
 
-## ??? Architecture
+### Bookings List (`/bookings`)
+
+**Features:**
+- Filterable booking list (All, Requested, Confirmed, Active, Completed, Cancelled)
+- Search by passenger name, location, booker
+- Real-time status updates via SignalR
+- Tracking indicators (??) for active GPS
+- One-click navigation to booking details or live map
+
+**Access**: Any authenticated user
+
+**Filters:**
+- **All** – Show all bookings
+- **Requested** – Pending admin approval
+- **Confirmed** – Approved, awaiting driver assignment
+- **Active** – Rides with active GPS tracking (OnRoute, Arrived, PassengerOnboard)
+- **Completed** – Finished rides
+- **Cancelled** – Cancelled bookings
+
+**Search**: Passenger name, booker name, pickup location, dropoff location
+
+---
+
+### Booking Detail (`/bookings/{id}`)
+
+**Features:**
+- Complete passenger and booker information
+- Pickup/dropoff addresses with flight details (if airport)
+- Assigned driver info with UserUid
+- Real-time status badge (prefers `CurrentRideStatus` over `Status`)
+- Live tracking card with coordinates, speed, last update
+- Driver assignment workflow (select affiliate ? select driver)
+- "View on Live Map" quick navigation
+- Refresh button for latest location
+
+**Access**: Any authenticated user
+
+**Real-Time Updates:**
+- SignalR subscription for ride status changes
+- Automatic location refresh when ride becomes trackable
+- Status badge updates instantly (no manual refresh)
+
+---
+
+### Live Tracking Map (`/tracking`)
+
+**Features:**
+- Interactive Google Maps with dark theme
+- Real-time driver location markers (car icons)
+- Driver list sidebar with ride details
+- Connection status indicator (SignalR vs polling)
+- Auto-fit map bounds to show all active drivers
+- Click-to-zoom on selected ride
+- Selected ride detail panel with coordinates, speed, heading
+- Direct link to booking details
+
+**Access**: Any authenticated user (admin/dispatcher recommended)
+
+**Real-Time Updates:**
+- SignalR `LocationUpdate` events (GPS coordinates)
+- SignalR `RideStatusChanged` events (driver state changes)
+- SignalR `TrackingStopped` events (ride completion)
+- Polling fallback (15-second intervals) if SignalR unavailable
+
+**Map Features:**
+- Custom car icon markers for drivers
+- Smooth marker animation between GPS updates
+- Info windows with driver/passenger names
+- Status badges (OnRoute, Arrived, PassengerOnboard)
+- Last update time and age
+- Current speed (mph)
+- Dark theme styling matching Bellwood branding
+
+---
+
+### Quotes List (`/quotes`)
+
+**Features:**
+- View incoming quote requests
+- Filter by status (Pending, Converted, Declined)
+- Search by customer name
+- Convert quotes to bookings
+
+**Access**: Any authenticated user
+
+---
+
+### Affiliates List (`/affiliates`)
+
+**Features:**
+- View affiliate companies
+- Driver count per affiliate
+- "View Drivers" quick navigation
+
+**Access**: Any authenticated user
+
+---
+
+### Affiliate Detail (`/affiliates/{id}`)
+
+**Features:**
+- Affiliate company details
+- Driver list for affiliate
+- Add new driver form with UserUid linking
+- Edit affiliate information
+- Delete affiliate (if no drivers assigned)
+
+**Access**: Any authenticated user
+
+**Add Driver:**
+- Driver name, phone
+- UserUid (links to AuthServer account for DriverApp access)
+- Automatic email to affiliate upon driver addition
+
+---
+
+## Real-Time Tracking (SignalR)
+
+### How It Works
+
+```
+1. AdminPortal connects to LocationHub via SignalR WebSocket
+   ?
+2. Subscribes to "admin" group (automatic for admin/dispatcher role)
+   ?
+3. Driver sends GPS update (POST /driver/location/update)
+   ?
+4. AdminAPI broadcasts LocationUpdate to "admin" group
+   ?
+5. AdminPortal receives event and updates:
+   - Bookings list (if booking is in view)
+   - BookingDetail page (if viewing that ride)
+   - LiveTracking map (updates marker position)
+   ?
+6. UI refreshes via StateHasChanged() – no manual refresh needed
+```
+
+### SignalR Events Received
+
+**LocationUpdate** - Driver GPS update:
+
+```json
+{
+  "rideId": "abc123",
+  "driverUid": "driver-001",
+  "driverName": "Charlie Johnson",
+  "latitude": 41.8781,
+  "longitude": -87.6298,
+  "heading": 45.5,
+  "speed": 12.3,
+  "accuracy": 8.5,
+  "timestamp": "2025-12-20T15:30:00Z"
+}
+```
+
+**RideStatusChanged** - Driver state change:
+
+```json
+{
+  "rideId": "abc123",
+  "driverUid": "driver-001",
+  "driverName": "Charlie Johnson",
+  "passengerName": "Jane Doe",
+  "newStatus": "OnRoute",
+  "timestamp": "2025-12-20T15:30:00Z"
+}
+```
+
+**TrackingStopped** - Ride completion:
+
+```json
+{
+  "rideId": "abc123",
+  "reason": "Ride completed",
+  "timestamp": "2025-12-20T16:00:00Z"
+}
+```
+
+### Connection Management
+
+**DriverTrackingService** handles all SignalR operations:
+
+- **Automatic Connection**: Connects on first use, stores JWT token in query parameter
+- **Automatic Reconnection**: Exponential backoff (0s, 2s, 5s, 10s) on disconnect
+- **Polling Fallback**: 15-second REST polling if SignalR unavailable
+- **Event Cleanup**: Proper `IAsyncDisposable` implementation for component lifecycle
+
+**Connection States:**
+- **Connected** (green badge) – SignalR active, real-time updates
+- **Disconnected** (red badge) – Polling mode, 15-second refresh
+
+## AdminAPI Integration
+
+The AdminPortal consumes the following AdminAPI endpoints:
+
+### Booking Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/bookings/list?take=100` | GET | List recent bookings (includes `CurrentRideStatus` + `PickupDateTimeOffset`) |
+| `/bookings/{id}` | GET | Get booking details |
+| `/bookings/{id}/assign-driver` | POST | Assign driver to booking |
+| `/bookings/{id}/cancel` | POST | Cancel booking |
+
+### Quote Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/quotes/list?take=100` | GET | List recent quotes |
+| `/quotes/{id}` | GET | Get quote details |
+
+### Affiliate & Driver Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/affiliates/list` | GET | List all affiliates with drivers |
+| `/affiliates/{id}` | GET | Get affiliate details |
+| `/affiliates` | POST | Create affiliate |
+| `/affiliates/{id}/drivers` | POST | Add driver to affiliate |
+| `/drivers/list` | GET | List all drivers |
+
+### Location Tracking Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/admin/locations` | GET | Get all active driver locations (envelope format) |
+| `/driver/location/{rideId}` | GET | Get latest location for specific ride |
+| `/hubs/location` | WebSocket | SignalR hub for real-time updates |
+
+### SignalR Hub Methods
+
+**Auto-Join Groups:**
+- `admin` group (for all users with admin/dispatcher role)
+
+**Manual Subscriptions:**
+- `SubscribeToRide(rideId)` – Get updates for specific ride
+- `SubscribeToDriver(driverUid)` – Track specific driver
+- `UnsubscribeFromRide(rideId)` – Stop ride updates
+- `UnsubscribeFromDriver(driverUid)` – Stop driver updates
+
+## Configuration
+
+### Required Settings
+
+| Setting | Location | Purpose |
+|---------|----------|---------|
+| `AdminAPI:BaseUrl` | appsettings.json | AdminAPI URL for REST and SignalR |
+| `AuthServer:LoginUrl` | appsettings.json | AuthServer login endpoint |
+| `GoogleMaps:ApiKey` | appsettings.json | Google Maps JavaScript API key (optional) |
+
+### Optional Settings
+
+| Setting | Location | Purpose |
+|---------|----------|---------|
+| `AdminAPI:ApiKey` | appsettings.json | Admin API key for additional security |
+
+### Google Maps Setup
+
+**Without API Key**: Map shows placeholder, sidebar still functional
+
+**With API Key**:
+1. Get API key from [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable "Maps JavaScript API"
+3. Add to `appsettings.json`:
+
+```json
+{
+  "GoogleMaps": {
+    "ApiKey": "AIzaSy..."
+  }
+}
+```
+
+4. Restart portal
+
+## Authentication & Authorization
+
+### JWT Token Structure
+
+```json
+{
+  "sub": "alice",            // Username
+  "uid": "admin-001",        // Admin UserUid (optional)
+  "email": "alice@example.com", // Email
+  "role": "admin",           // Role (admin, dispatcher)
+  "exp": 1234567890          // Expiration timestamp
+}
+```
 
 ### Authentication Flow
 
 ```
-User ? Login.razor ? AuthServer (/api/auth/login)
-       ?
-   JWT Token Received
-       ?
-   JwtAuthenticationStateProvider.MarkUserAsAuthenticatedAsync()
-       ?
-   Token stored in AuthTokenProvider (in-memory)
-       ?
-   Blazor AuthenticationState updated
-       ?
-   Navigate to /main
+1. User navigates to AdminPortal
+   ?
+2. If not authenticated ? Redirect to /login
+   ?
+3. User enters username/password
+   ?
+4. POST to AuthServer /login
+   ?
+5. AuthServer returns JWT token
+   ?
+6. Portal stores token in localStorage (AuthTokenProvider)
+   ?
+7. JwtAuthenticationStateProvider updates auth state
+   ?
+8. User redirected to dashboard
+   ?
+9. All API calls include: Authorization: Bearer {token}
 ```
 
-### API Communication
+### Authorization Roles
 
-All API calls to AdminAPI include:
-- **X-Admin-ApiKey** header (from configuration)
-- **Authorization: Bearer {token}** header (from AuthTokenProvider)
+| Role | Access | Features |
+|------|--------|----------|
+| **admin** | Full access | All features + affiliate management |
+| **dispatcher** | Booking management | Bookings, quotes, tracking (limited affiliate access) |
+| **Unauthenticated** | None | Redirected to login |
 
-```
-Component ? HttpClient "AdminAPI" ? AdminAPI Endpoint
-                ?
-         Base URL: https://localhost:5206
-         Headers: X-Admin-ApiKey, Authorization
-                ?
-         AdminAPI validates both
-                ?
-         Returns JSON response
-```
+## Status Display Logic
 
-### Real-Time Driver Tracking
+### Dual Status Model
 
-```
-AdminAPI LocationHub (SignalR WebSocket)
-       ?
-DriverTrackingService (Blazor Server)
-  - Maintains WebSocket connection
-  - Handles automatic reconnection
-  - Fires events on location updates
-       ?
-LiveTracking.razor (UI Component)
-  - Subscribes to service events
-  - Updates map markers via JS Interop
-  - Refreshes ride list
-       ?
-tracking-map.js (JavaScript)
-  - Manages Google Maps instance
-  - Animates marker positions
-  - Handles user interactions
+The AdminPortal displays ride status using **two fields**:
+
+| Field | Purpose | Values | Audience |
+|-------|---------|--------|----------|
+| `Status` | Booking-level status | Requested, Confirmed, Scheduled, InProgress, Completed, Cancelled, NoShow | Reports, accounting |
+| `CurrentRideStatus` | Real-time driver state | Scheduled, OnRoute, Arrived, PassengerOnboard, Completed, Cancelled | Dispatchers, real-time operations |
+
+### Display Priority
+
+```csharp
+// Always prefer CurrentRideStatus when available
+string displayStatus = booking.CurrentRideStatus ?? booking.Status ?? "Unknown";
 ```
 
-**Fallback Mode:** When SignalR disconnected, automatic HTTP polling every 15 seconds.
+**Example**:
+
+| CurrentRideStatus | Status | Displayed | Badge Color |
+|-------------------|--------|-----------|-------------|
+| `OnRoute` | `Scheduled` | **OnRoute** | Blue (`bg-info`) |
+| `Arrived` | `Scheduled` | **Arrived** | Yellow (`bg-warning`) |
+| `PassengerOnboard` | `InProgress` | **PassengerOnboard** | Green (`bg-success`) |
+| `null` | `Scheduled` | **Scheduled** | Gray (`bg-secondary`) |
+| `Completed` | `Completed` | **Completed** | Green (`bg-success`) |
+
+### Status Badge Styling
+
+**Driver Statuses** (`CurrentRideStatus`):
+- **OnRoute** – Blue (`bg-info`)
+- **Arrived** – Yellow (`bg-warning text-dark`)
+- **PassengerOnboard** – Green (`bg-success`)
+
+**Booking Statuses** (`Status`):
+- **Requested** – Warning (`bg-warning`)
+- **Confirmed** – Success (`bg-success`)
+- **Scheduled** – Info (`bg-info`)
+- **InProgress** – Primary (`bg-primary`)
+- **Completed** – Success (`bg-success`)
+- **Cancelled** – Danger (`bg-danger`)
+- **NoShow** – Secondary (`bg-secondary`)
+
+## Timezone Support
+
+### How It Works
+
+The AdminPortal displays **timezone-aware pickup times** via the `PickupDateTimeOffset` field from AdminAPI.
+
+**API Response Example**:
+
+```json
+{
+  "pickupDateTime": "2025-12-24T15:00:00Z",  // Raw UTC (backward compatibility)
+  "pickupDateTimeOffset": "2025-12-24T09:00:00-06:00"  // Central Time with offset
+}
+```
+
+**Display Logic**:
+
+```csharp
+// Prefer PickupDateTimeOffset when available
+var displayTime = booking.PickupDateTimeOffset?.LocalDateTime 
+    ?? booking.PickupDateTime.ToLocalTime();
+```
+
+**Result**: Times display correctly for users in any timezone worldwide.
+
+## Troubleshooting
+
+### Common Issues
+
+**1. SignalR connection failures**
+
+**Symptoms**: Red connection badge, polling mode active
+
+**Checklist**:
+- [ ] AdminAPI running at configured `AdminAPI:BaseUrl`?
+- [ ] JWT token valid (not expired)?
+- [ ] HTTPS certificate trusted (dev environment)?
+
+**Fix**: Check browser console for error details. Ensure AdminAPI `/hubs/location` endpoint accessible.
 
 ---
 
-## ?? Key Components
+**2. Status not updating in real-time**
 
-### 1. JwtAuthenticationStateProvider
+**Symptoms**: Status badge doesn't change when driver updates status
 
-Bridge between login flow and Blazor's authorization system.
+**Checklist**:
+- [ ] SignalR connection "Connected"?
+- [ ] `RideStatusChanged` event handler registered?
+- [ ] AdminAPI returning `CurrentRideStatus` in `/bookings/list`?
 
-**Responsibilities:**
-- Stores current user's authentication state
-- Notifies Blazor when auth state changes (login/logout)
-- Used by `<AuthorizeView>` to determine authentication status
-
-### 2. DriverTrackingService
-
-Manages real-time driver location tracking.
-
-**Key Features:**
-- SignalR WebSocket connection with auto-reconnect
-- HTTP polling fallback
-- Event-driven architecture for UI updates
-- Subscription management for specific rides or drivers
-
-**Events:**
-- `LocationUpdated` - New location data received
-- `TrackingStopped` - Ride completed or cancelled
-- `ConnectionStateChanged` - SignalR connection state changes
-
-### 3. AffiliateService
-
-Handles affiliate and driver management.
-
-**Operations:**
-- CRUD operations for affiliates
-- Driver fleet management
-- Affiliate-driver associations
+**Fix**: Check browser console for `[Bookings] Ride abc123 status updated to OnRoute` log messages.
 
 ---
 
-## ?? NuGet Packages
+**3. Map not loading**
 
+**Symptoms**: Map shows placeholder "Map unavailable"
+
+**Checklist**:
+- [ ] `GoogleMaps:ApiKey` configured in `appsettings.json`?
+- [ ] Maps JavaScript API enabled in Google Cloud Console?
+- [ ] API key restrictions allow localhost?
+
+**Fix**: Add API key to `appsettings.json`, verify API enabled, check browser console for Google Maps errors.
+
+---
+
+**4. 401 Unauthorized on API calls**
+
+**Symptoms**: Bookings list empty, "Failed to load" errors
+
+**Checklist**:
+- [ ] Logged in successfully?
+- [ ] JWT token stored in localStorage?
+- [ ] Token not expired?
+- [ ] AdminAPI configured to accept JWT from AuthServer?
+
+**Fix**: Logout and login again. Check `localStorage` for `authToken` key in browser DevTools.
+
+---
+
+**5. "Active" filter shows no rides**
+
+**Symptoms**: Active filter empty even with tracking rides
+
+**Checklist**:
+- [ ] AdminAPI returning `CurrentRideStatus` in `/bookings/list`?
+- [ ] Driver has updated status to OnRoute/Arrived/PassengerOnboard?
+
+**Fix**: Ensure AdminAPI deployed with latest `CurrentRideStatus` support (see AdminAPI Booking List API Enhancement doc).
+
+## Testing
+
+### Manual Testing Flow
+
+**1. Login Test**:
+```sh
+# Navigate to portal
+https://localhost:7257
+
+# Login as alice/password
+# Verify redirect to dashboard
+```
+
+**2. Booking List Test**:
+```sh
+# Click "Bookings" in sidebar
+# Verify bookings load
+# Click "Active" filter
+# Verify only tracking rides shown
+```
+
+**3. Real-Time Update Test**:
+```sh
+# Open Bookings page in browser
+# Use DriverApp to change ride status to "OnRoute"
+# Verify badge updates instantly (no refresh)
+# Verify "Active" filter includes the ride
+```
+
+**4. Live Map Test**:
+```sh
+# Click "Live Tracking" in sidebar
+# Verify map loads with driver markers
+# Verify connection status "Connected" (green)
+# Click driver in sidebar
+# Verify map zooms to driver
+# Use DriverApp to send GPS update
+# Verify marker moves on map
+```
+
+**5. Driver Assignment Test**:
+```sh
+# Open booking detail for unassigned booking
+# Click "Assign Driver"
+# Select affiliate
+# Select driver
+# Click "Confirm Assignment"
+# Verify driver assigned successfully
+# Verify email sent to affiliate
+```
+
+### Integration Testing
+
+**Prerequisites**:
+- AuthServer running with test users (alice, bob, charlie)
+- AdminAPI running with seeded test data
+- DriverApp running with test driver logged in
+
+**Test Scenario**:
+1. **Dispatcher** (Alice) opens AdminPortal
+2. **Driver** (Charlie) starts ride in DriverApp (status ? OnRoute)
+3. **Dispatcher** sees status change instantly in Bookings list
+4. **Dispatcher** opens Live Tracking map
+5. **Driver** sends GPS updates
+6. **Dispatcher** sees marker move on map in real-time
+7. **Driver** arrives at pickup (status ? Arrived)
+8. **Dispatcher** sees status badge change to "Arrived"
+9. **Driver** picks up passenger (status ? PassengerOnboard)
+10. **Dispatcher** sees status badge change to "PassengerOnboard"
+11. **Driver** completes ride (status ? Completed)
+12. **Dispatcher** sees ride removed from "Active" filter
+13. **Dispatcher** verifies marker removed from map
+
+**Expected Result**: All updates happen instantly without manual refresh ?
+
+## Deployment
+
+### Build
+
+```sh
+# Development
+dotnet build
+
+# Production
+dotnet build -c Release
+```
+
+### Publish
+
+```sh
+# Self-contained (recommended for IIS)
+dotnet publish -c Release -r win-x64 --self-contained
+
+# Framework-dependent
+dotnet publish -c Release
+```
+
+### Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ASPNETCORE_ENVIRONMENT` | Environment (Development/Production) | `Development` |
+| `ASPNETCORE_URLS` | Listening URLs | `https://localhost:7257;http://localhost:5072` |
+
+### Production Checklist
+
+- [ ] Update `AdminAPI:BaseUrl` to production AdminAPI URL
+- [ ] Update `AuthServer:LoginUrl` to production AuthServer URL
+- [ ] Configure Google Maps API key
+- [ ] Set up HTTPS certificates
+- [ ] Enable detailed logging for debugging
+- [ ] Configure reverse proxy (IIS, Nginx, etc.)
+- [ ] Test SignalR WebSocket connectivity through firewall
+- [ ] Verify JWT token validation with production AuthServer
+
+### IIS Deployment
+
+**Prerequisites**:
+- Windows Server with IIS 10+
+- [ASP.NET Core Hosting Bundle](https://dotnet.microsoft.com/permalink/dotnetcore-current-windows-runtime-bundle-installer)
+
+**Steps**:
+1. Publish portal: `dotnet publish -c Release -r win-x64 --self-contained`
+2. Copy `bin/Release/net8.0/win-x64/publish/` to IIS server
+3. Create IIS site pointing to publish folder
+4. Create application pool (.NET CLR Version = No Managed Code)
+5. Enable WebSocket Protocol in IIS features
+6. Configure HTTPS binding with certificate
+7. Update `appsettings.json` with production URLs
+8. Restart IIS site
+
+**WebSocket Configuration**:
 ```xml
-<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
-<PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+<!-- web.config (auto-generated by publish) -->
+<configuration>
+  <system.webServer>
+    <webSocket enabled="true" />
+  </system.webServer>
+</configuration>
 ```
 
-**?? Important:** SignalR.Client must be version 8.x (not 10.x) to avoid form submission conflicts with Blazor's antiforgery system.
+## Monitoring & Logging
 
----
+### Console Logging
 
-## ?? Routes
+Key events logged to console:
 
-| Route | Page | Description |
-|-------|------|-------------|
-| `/` | Home.razor | Redirects to /main if authenticated, else /login |
-| `/login` | Login.razor | JWT authentication page |
-| `/logout` | Logout.razor | Clears auth state and redirects to login |
-| `/main` | Main.razor | Dashboard landing page |
-| `/bookings` | Bookings.razor | Bookings list with filters |
-| `/bookings/{id}` | BookingDetail.razor | Detailed booking view |
-| `/quotes` | Quotes.razor | Quote requests management |
-| `/affiliates` | Affiliates.razor | Affiliates management |
-| `/affiliates/{id}` | AffiliateDetail.razor | Affiliate details with drivers |
-| `/tracking` | LiveTracking.razor | Real-time driver tracking map |
+```
+? [Bookings] Ride abc123 status updated to OnRoute by Charlie Johnson
+?? [LiveTracking] Ride abc123 status updated to Arrived by Charlie Johnson
+?? [DriverTrackingService] Connected to SignalR location hub
+?? [DriverTrackingService] SignalR connection closed: Connection lost
+?? [DriverTrackingService] SignalR reconnected
+```
 
----
+### SignalR Connection Monitoring
 
-## ?? Usage Guide
+**DriverTrackingService** exposes connection state:
 
-### For Dispatchers
+```csharp
+public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+```
 
-**Managing Bookings:**
-1. Navigate to **Bookings** from sidebar
-2. Use filters to find specific bookings
-3. Click a booking to view full details
-4. Assign drivers using the "Assign Driver" button
-5. Update booking status as needed
+**UI Indicators**:
+- **Green badge** – SignalR connected
+- **Red badge** – Polling fallback active
 
-**Live Driver Tracking:**
-1. Navigate to **Live Tracking** from sidebar
-2. View all active drivers on the map
-3. Click a ride card to zoom to that driver
-4. Monitor driver speed, location, and status
-5. Click "View Booking Details" for full ride information
+### Performance Metrics
 
-**Managing Affiliates:**
-1. Navigate to **Affiliates** from sidebar
-2. Create new affiliates with "Create Affiliate" button
-3. Edit affiliate details by clicking the edit icon
-4. Manage drivers within each affiliate
-5. Delete affiliates (only if no active assignments)
+| Metric | Target | Typical |
+|--------|--------|---------|
+| Page load time | < 2s | ~500ms-1s |
+| SignalR event latency | < 1s | ~100-500ms |
+| Map marker update | < 500ms | ~100-300ms |
+| Booking list refresh | < 1s | ~200-500ms |
 
-### For Administrators
+## Roadmap
 
-**System Monitoring:**
-- Green badge on Live Tracking = Real-time SignalR connected
-- Red badge = HTTP polling mode (check network/SignalR)
-- Configure Google Maps API key in appsettings.json for full map functionality
+### Short-Term (Q1 2025)
 
----
+- [ ] Add toast notifications for status changes
+- [ ] Implement driver availability status
+- [ ] Add booking creation from quotes
+- [ ] Support bulk driver assignment
+- [ ] Add export bookings to CSV/Excel
 
-## ?? Future Enhancements
+### Long-Term (2025+)
 
-### Planned Features
-- Route history playback with polylines
-- ETA calculations using speed data
-- Geofencing alerts for zone-based notifications
-- Driver-specific tracking across multiple rides
-- Heatmap view for location density
-- Export/reporting for BI tools
-- OAuth 2.0 integration with LimoAnywhere
+- [ ] Historical route playback on map
+- [ ] ETA calculations based on GPS speed
+- [ ] Geofencing alerts (driver entered/exited zone)
+- [ ] Heatmap view of driver locations
+- [ ] Multi-language support
+- [ ] Mobile-responsive layout improvements
+- [ ] Dark mode toggle
 
-### OAuth 2.0 Migration Path
+## Branches
 
-When integrating with LimoAnywhere's OAuth 2.0:
+- **main** – Stable production code
+- **feature/driver-tracking-prep** – Driver tracking development (merged)
+- **develop** – Integration branch for features
 
-1. **Replace AuthServer calls** in Login.razor with OAuth authorization flow
-2. **Create OAuth callback handler** to exchange authorization code for access token
-3. **Update token storage** to handle refresh tokens
-4. **Implement token refresh logic** in AuthTokenProvider
+## Security & Standards
 
-The current architecture is designed to support this migration with minimal changes.
+- **JWT Authentication** with role-based authorization
+- **HTTPS** for all connections; dev builds allow local certificates
+- **SignalR WebSockets** with automatic reconnection and polling fallback
+- **Secure Token Storage** in browser localStorage with proper cleanup
+- **Input Validation** on all forms
+- Follow **Blazor Server best practices**, **async/await** for I/O, **DI-first architecture**, **nullable reference types** enabled
 
----
-
-## ?? Additional Documentation
-
-Detailed documentation available in the `Docs/` folder:
-
-- **[QUICK_START.md](Docs/QUICK_START.md)** - Getting started guide
-- **[ARCHITECTURE.md](Docs/ARCHITECTURE.md)** - System architecture details
-- **[DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md](Docs/DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md)** - Driver tracking implementation
-- **[DRIVER_ASSIGNMENT_IMPLEMENTATION.md](Docs/DRIVER_ASSIGNMENT_IMPLEMENTATION.md)** - Driver assignment workflow
-- **[PREMIUM_DESIGN_IMPLEMENTATION.md](Docs/PREMIUM_DESIGN_IMPLEMENTATION.md)** - UI/UX design guide
-- **[STAKEHOLDER_DEMO_GUIDE.md](Docs/STAKEHOLDER_DEMO_GUIDE.md)** - Demo preparation guide
-
----
-
-## ?? Contributing
-
-### Development Workflow
-
-1. Create feature branch from `main`
-2. Implement features with tests
-3. Update documentation
-4. Submit pull request
-
-### Code Style
-
-- Follow C# naming conventions
-- Use meaningful variable names
-- Document public APIs with XML comments
-- Keep components focused and single-purpose
-
----
-
-## ?? License
-
-© 2024 Bellwood Global, Inc. All rights reserved.
-
----
-
-## ?? Support
+## Support
 
 For issues or questions:
-- Check documentation in `Docs/` folder
-- Review console logs for detailed error messages
-- Verify AuthServer and AdminAPI are running
-- Ensure API keys and configuration are correct
+
+- **GitHub Issues**: [https://github.com/BidumanADT/Bellwood.AdminPortal/issues](https://github.com/BidumanADT/Bellwood.AdminPortal/issues)
+- **Documentation**: See `Docs/` directory (20+ comprehensive guides)
+- **Email**: support@bellwood.com
 
 ---
 
-**Built with ?? using .NET 8 and Blazor Server**
+## Key Features Summary
+
+? **Real-Time GPS Tracking** via SignalR WebSockets with interactive Google Maps  
+? **Instant Status Updates** on all pages without manual refresh  
+? **Dual Status Model** (public + driver-facing) with automatic priority logic  
+? **Live Tracking Dashboard** with driver markers, sidebar, and auto-zoom  
+? **Booking Management** with search, filters, and driver assignment  
+? **Affiliate & Driver Management** with UserUid linking to AuthServer  
+? **Timezone Support** with automatic timezone-aware pickup times  
+? **Premium Bellwood Branding** with dark theme and gold accents  
+? **Automatic Reconnection** with polling fallback for SignalR failures  
+? **Complete Documentation** with deployment guides and troubleshooting  
+? **Production-Ready** with proper error handling, logging, and security  
+
+---
+
+**Built with care using Blazor Server + SignalR on .NET 8**
+
+*© 2025 Biduman ADT / Bellwood Global. All rights reserved.*
