@@ -112,8 +112,8 @@
                                                     }
                                                 </div>
                                                 <div class="text-end">
-                                                    <span class="badge @GetStatusBadgeClass(location.Status)">
-                                                        @location.Status
+                                                    <span class="badge @GetStatusBadgeClass(location.CurrentStatus ?? location.Status)">
+                                                        @(location.CurrentStatus ?? location.Status)
                                                     </span>
                                                     <br />
                                                     <small class="text-muted">
@@ -152,7 +152,14 @@
                                 </div>
                                 <div class="mb-2">
                                     <strong>Status:</strong> 
-                                    <span class="badge @GetStatusBadgeClass(selectedRide.Status)">@selectedRide.Status</span>
+                                    <span class="badge @GetStatusBadgeClass(selectedRide.CurrentStatus ?? selectedRide.Status)">
+                                        @(selectedRide.CurrentStatus ?? selectedRide.Status)
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(selectedRide.CurrentStatus) && selectedRide.CurrentStatus != selectedRide.Status)
+                                    {
+                                        <br />
+                                        <small class="text-muted">Booking Status: @selectedRide.Status</small>
+                                    }
                                 </div>
                                 <div class="mb-2">
                                     <strong>Coordinates:</strong>
@@ -231,6 +238,7 @@
         // Subscribe to tracking service events
         TrackingService.LocationUpdated += OnLocationUpdated;
         TrackingService.TrackingStopped += OnTrackingStopped;
+        TrackingService.RideStatusChanged += OnRideStatusChanged;
         TrackingService.ConnectionStateChanged += OnConnectionStateChanged;
 
         // Load initial data
@@ -285,9 +293,15 @@
                 await UpdateMapMarkersAsync();
             }
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = $"Access Denied: {ex.Message}";
+            Console.WriteLine($"[LiveTracking] 403 Forbidden: {ex.Message}");
+        }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load active locations: {ex.Message}";
+            Console.WriteLine($"[LiveTracking] Error: {ex.Message}");
         }
         finally
         {
@@ -388,6 +402,35 @@
         });
     }
 
+    private async void OnRideStatusChanged(object? sender, RideStatusChangedEvent evt)
+    {
+        await InvokeAsync(() =>
+        {
+            // Update the status of the ride in the list
+            var ride = activeLocations.FirstOrDefault(l => l.RideId == evt.RideId);
+            if (ride != null)
+            {
+                ride.CurrentStatus = evt.NewStatus;
+                ride.Status = evt.NewStatus; // Update legacy field too for compatibility
+                
+                if (selectedRide?.RideId == evt.RideId)
+                {
+                    selectedRide.CurrentStatus = evt.NewStatus;
+                    selectedRide.Status = evt.NewStatus;
+                }
+                
+                Console.WriteLine($"[LiveTracking] Ride {evt.RideId} status updated to {evt.NewStatus} by {evt.DriverName}");
+            }
+            else
+            {
+                // Ride not in list yet - might be a new ride that just started
+                Console.WriteLine($"[LiveTracking] Received status update for unknown ride {evt.RideId}, refreshing list");
+            }
+            
+            StateHasChanged();
+        });
+    }
+
     private void OnConnectionStateChanged(object? sender, bool connected)
     {
         InvokeAsync(() =>
@@ -462,7 +505,11 @@
         "onroute" => "bg-info",
         "arrived" => "bg-warning text-dark",
         "passengeronboard" => "bg-success",
+        "completed" => "bg-success",
+        "cancelled" => "bg-danger",
         "confirmed" => "bg-primary",
+        "scheduled" => "bg-secondary",
+        "inprogress" => "bg-primary",
         _ => "bg-secondary"
     };
 
@@ -487,6 +534,7 @@
         
         TrackingService.LocationUpdated -= OnLocationUpdated;
         TrackingService.TrackingStopped -= OnTrackingStopped;
+        TrackingService.RideStatusChanged -= OnRideStatusChanged;
         TrackingService.ConnectionStateChanged -= OnConnectionStateChanged;
 
         if (mapInitialized)

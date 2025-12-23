@@ -60,16 +60,43 @@ public class ActiveRideLocationDto
     public string? PassengerName { get; set; }
     public string? PickupLocation { get; set; }
     public string? DropoffLocation { get; set; }
+    
+    /// <summary>
+    /// Legacy booking status field (Scheduled, InProgress, Completed)
+    /// </summary>
     public string? Status { get; set; }
+    
+    /// <summary>
+    /// Real-time driver status (OnRoute, Arrived, PassengerOnboard, etc.)
+    /// Prefer this over Status for displaying current ride state.
+    /// </summary>
+    public string? CurrentStatus { get; set; }
+    
+    /// <summary>
+    /// Age of location data in seconds
+    /// </summary>
+    public double AgeSeconds { get; set; }
 }
 
 /// <summary>
-/// Tracking status information for UI display
+/// Wrapper for GET /admin/locations endpoint response
 /// </summary>
-public class TrackingStatusInfo
+public class LocationsResponse
+{
+    public int Count { get; set; }
+    public List<ActiveRideLocationDto> Locations { get; set; } = new();
+    public DateTime Timestamp { get; set; }
+}
+
+/// <summary>
+/// SignalR event when a driver updates ride status
+/// </summary>
+public class RideStatusChangedEvent
 {
     public string RideId { get; set; } = string.Empty;
-    public bool IsTracking { get; set; }
-    public DateTime? LastUpdateTime { get; set; }
-    public string? StatusMessage { get; set; }
+    public string DriverUid { get; set; } = string.Empty;
+    public string? DriverName { get; set; }
+    public string? PassengerName { get; set; }
+    public string NewStatus { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
 }
