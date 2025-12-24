@@ -263,8 +263,8 @@
 
     private void ViewDetails(string quoteId)
     {
-        // TODO: Navigate to detail page or show modal
-        Console.WriteLine($"[Quotes] View quote: {quoteId}");
+        Console.WriteLine($"[Quotes] Navigating to quote detail: {quoteId}");
+        Navigation.NavigateTo($"/quotes/{quoteId}");
     }
 
     // DTO model (matches AdminAPI response)

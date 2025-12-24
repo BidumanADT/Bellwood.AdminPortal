@@ -1,0 +1,444 @@
+@page "/quotes/{QuoteId}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@inject IQuoteService QuoteService
+@inject NavigationManager Navigation
+
+<PageTitle>Quote Detail - Bellwood Elite</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col">
+                    <button class="btn btn-outline-secondary mb-3" @onclick="GoBack">
+                        ? Back to Quotes
+                    </button>
+                    <h2 class="text-bellwood-gold">?? Quote Request Details</h2>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading quote details...</p>
+                </div>
+            }
+            else if (quote == null)
+            {
+                <div class="alert alert-danger">
+                    Quote not found.
+                    <button class="btn btn-sm btn-outline-danger ms-2" @onclick="GoBack">
+                        Return to Quotes
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    <!-- Quote Information Card -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="card-title mb-3">Quote Information</h4>
+                                
+                                <div class="mb-3">
+                                    <strong>Quote ID:</strong> @quote.Id
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <strong>Status:</strong>
+                                    <span class="status-chip status-@(GetStatusClass(quote.Status))">
+                                        @FormatStatus(quote.Status)
+                                    </span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <strong>Created:</strong> @quote.CreatedUtc.ToLocalTime().ToString("g")
+                                </div>
+
+                                @if (quote.UpdatedUtc.HasValue)
+                                {
+                                    <div class="mb-3">
+                                        <strong>Last Updated:</strong> @quote.UpdatedUtc.Value.ToLocalTime().ToString("g")
+                                        @if (!string.IsNullOrEmpty(quote.UpdatedBy))
+                                        {
+                                            <span class="text-muted"> by @quote.UpdatedBy</span>
+                                        }
+                                    </div>
+                                }
+
+                                <hr class="my-3" />
+
+                                <h5 class="mb-3">Booker Information</h5>
+                                <div class="mb-2">
+                                    <strong>Name:</strong> @quote.BookerName
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Email:</strong> @quote.BookerEmail
+                                </div>
+                                @if (!string.IsNullOrEmpty(quote.BookerPhone))
+                                {
+                                    <div class="mb-2">
+                                        <strong>Phone:</strong> @quote.BookerPhone
+                                    </div>
+                                }
+
+                                <hr class="my-3" />
+
+                                <h5 class="mb-3">Trip Details</h5>
+                                <div class="mb-2">
+                                    <strong>Passenger:</strong> @quote.PassengerName
+                                </div>
+                                @if (!string.IsNullOrEmpty(quote.PassengerPhone))
+                                {
+                                    <div class="mb-2">
+                                        <strong>Passenger Phone:</strong> @quote.PassengerPhone
+                                    </div>
+                                }
+                                <div class="mb-2">
+                                    <strong>Vehicle Class:</strong> @quote.VehicleClass
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Passengers:</strong> @quote.PassengerCount
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Luggage:</strong> @quote.Luggage pieces
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Pickup Location:</strong> @quote.PickupLocation
+                                </div>
+                                @if (!string.IsNullOrEmpty(quote.DropoffLocation))
+                                {
+                                    <div class="mb-2">
+                                        <strong>Dropoff Location:</strong> @quote.DropoffLocation
+                                    </div>
+                                }
+                                <div class="mb-2">
+                                    <strong>Pickup Time:</strong> @quote.PickupDateTime.ToLocalTime().ToString("g")
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(quote.SpecialRequests))
+                                {
+                                    <hr class="my-3" />
+                                    <h5 class="mb-3">Special Requests</h5>
+                                    <div class="p-3" style="background: rgba(203, 161, 53, 0.1); border-radius: 8px;">
+                                        @quote.SpecialRequests
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing and Status Update Card -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="card-title mb-3">Quote Management</h4>
+                                
+                                <!-- Success/Error Messages -->
+                                @if (!string.IsNullOrEmpty(successMessage))
+                                {
+                                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                        @successMessage
+                                        <button type="button" class="btn-close" @onclick="ClearSuccessMessage"></button>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                        @errorMessage
+                                        <button type="button" class="btn-close" @onclick="ClearErrorMessage"></button>
+                                    </div>
+                                }
+
+                                <!-- Current Quote Status -->
+                                <div class="mb-4 p-3" style="background: rgba(203, 161, 53, 0.1); border-radius: 8px;">
+                                    <strong>Current Quoted Price:</strong>
+                                    @if (quote.QuotedPrice.HasValue)
+                                    {
+                                        <span class="text-success ms-2 fs-5">$@quote.QuotedPrice.Value.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-warning ms-2">Not yet priced</span>
+                                    }
+                                </div>
+
+                                <!-- Pricing Form -->
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Set Quote Price</strong></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               placeholder="Enter price" 
+                                               step="0.01"
+                                               min="0"
+                                               @bind="quotedPrice" />
+                                    </div>
+                                    <small class="form-text text-muted">Enter the price for this quote request</small>
+                                </div>
+
+                                <!-- Status Selection -->
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Update Status</strong></label>
+                                    <select class="form-select" @bind="selectedStatus">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="Submitted">Submitted (Initial)</option>
+                                        <option value="InReview">In Review</option>
+                                        <option value="Priced">Priced (Customer can view)</option>
+                                        <option value="Rejected">Rejected</option>
+                                        <option value="Closed">Closed</option>
+                                    </select>
+                                    <small class="form-text text-muted">
+                                        Set to "Priced" to notify the customer
+                                    </small>
+                                </div>
+
+                                <!-- Admin Notes -->
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Admin Notes</strong></label>
+                                    <textarea class="form-control" 
+                                              rows="4" 
+                                              placeholder="Add notes for internal reference (optional)"
+                                              @bind="adminNotes"></textarea>
+                                    <small class="form-text text-muted">
+                                        These notes are for internal use only and not visible to customers
+                                    </small>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(quote.AdminNotes))
+                                {
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Previous Notes</strong></label>
+                                        <div class="p-3" style="background: rgba(108, 117, 125, 0.1); border-radius: 8px;">
+                                            @quote.AdminNotes
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Action Buttons -->
+                                <div class="d-flex gap-2 mt-4">
+                                    <button class="btn btn-primary" 
+                                            @onclick="SaveQuote"
+                                            disabled="@isSaving">
+                                        @if (isSaving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                        }
+                                        ?? Save Changes
+                                    </button>
+                                    <button class="btn btn-outline-secondary" 
+                                            @onclick="ResetForm"
+                                            disabled="@isSaving">
+                                        ?? Reset
+                                    </button>
+                                </div>
+
+                                <!-- Quick Action Buttons -->
+                                <hr class="my-4" />
+                                <h5 class="mb-3">Quick Actions</h5>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-success btn-sm" 
+                                            @onclick="MarkAsPriced"
+                                            disabled="@isSaving">
+                                        ? Mark as Priced
+                                    </button>
+                                    <button class="btn btn-warning btn-sm" 
+                                            @onclick="MarkInReview"
+                                            disabled="@isSaving">
+                                        ?? Mark In Review
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" 
+                                            @onclick="RejectQuote"
+                                            disabled="@isSaving">
+                                        ? Reject Quote
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public string QuoteId { get; set; } = string.Empty;
+
+    private QuoteDetailDto? quote;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    
+    private decimal? quotedPrice;
+    private string selectedStatus = "";
+    private string adminNotes = "";
+    
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine($"[QuoteDetail] Loading quote: {QuoteId}");
+        await LoadQuoteAsync();
+    }
+
+    private async Task LoadQuoteAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        
+        try
+        {
+            quote = await QuoteService.GetQuoteAsync(QuoteId);
+            
+            if (quote != null)
+            {
+                // Initialize form with current values
+                quotedPrice = quote.QuotedPrice;
+                selectedStatus = quote.Status ?? "Submitted";
+                adminNotes = quote.AdminNotes ?? "";
+                
+                Console.WriteLine($"[QuoteDetail] Quote loaded: {quote.PassengerName}, Status: {quote.Status}");
+            }
+            else
+            {
+                Console.WriteLine($"[QuoteDetail] Quote not found: {QuoteId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load quote: {ex.Message}";
+            Console.WriteLine($"[QuoteDetail] Error loading quote: {errorMessage}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveQuote()
+    {
+        if (quote == null) return;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var updateDto = new UpdateQuoteDto
+            {
+                QuotedPrice = quotedPrice,
+                Status = string.IsNullOrWhiteSpace(selectedStatus) ? null : selectedStatus,
+                AdminNotes = string.IsNullOrWhiteSpace(adminNotes) ? null : adminNotes
+            };
+
+            await QuoteService.UpdateQuoteAsync(QuoteId, updateDto);
+
+            // Update local quote object
+            quote.QuotedPrice = quotedPrice;
+            quote.Status = selectedStatus;
+            quote.AdminNotes = adminNotes;
+            quote.UpdatedUtc = DateTime.UtcNow;
+
+            successMessage = "? Quote updated successfully! The customer will be notified if status is set to 'Priced'.";
+            Console.WriteLine($"[QuoteDetail] Quote updated: {QuoteId}, Price: {quotedPrice}, Status: {selectedStatus}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to update quote: {ex.Message}";
+            Console.WriteLine($"[QuoteDetail] Error updating quote: {errorMessage}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task MarkAsPriced()
+    {
+        selectedStatus = "Priced";
+        await SaveQuote();
+    }
+
+    private async Task MarkInReview()
+    {
+        selectedStatus = "InReview";
+        await SaveQuote();
+    }
+
+    private async Task RejectQuote()
+    {
+        selectedStatus = "Rejected";
+        await SaveQuote();
+    }
+
+    private void ResetForm()
+    {
+        if (quote != null)
+        {
+            quotedPrice = quote.QuotedPrice;
+            selectedStatus = quote.Status ?? "Submitted";
+            adminNotes = quote.AdminNotes ?? "";
+        }
+        
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void ClearSuccessMessage()
+    {
+        successMessage = null;
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/quotes");
+    }
+
+    private string GetStatusClass(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "submitted" => "submitted",
+            "inreview" => "inreview",
+            "priced" => "priced",
+            "rejected" => "rejected",
+            "closed" => "closed",
+            _ => "submitted"
+        };
+    }
+
+    private string FormatStatus(string? status)
+    {
+        return status switch
+        {
+            "InReview" => "In Review",
+            "Priced" => "Priced",
+            "Rejected" => "Rejected",
+            "Closed" => "Closed",
+            _ => status ?? "Submitted"
+        };
+    }
+}
