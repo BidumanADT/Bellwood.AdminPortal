@@ -15,8 +15,9 @@ Bellwood AdminPortal is the **command center** for dispatchers and administrator
 - ??? **Real-Time GPS Tracking** – Live driver location via SignalR WebSockets with Google Maps integration
 - ?? **Affiliate & Driver Management** – Multi-company fleet coordination with driver assignment
 - ?? **Status Monitoring** – Real-time ride status updates (OnRoute, Arrived, PassengerOnboard)
-- ?? **Live Map Dashboard** – Interactive tracking map with driver markers and route visualization
+- ??? **Live Map Dashboard** – Interactive tracking map with driver markers and route visualization
 - ?? **Timezone Support** – Automatic timezone-aware pickup times for worldwide operations
+- ?? **Quote Management** – Complete quote pricing workflow with status updates and customer notifications
 - ?? **Secure Authentication** – JWT-based login with role-based authorization
 - ?? **Responsive Design** – Premium Bellwood Elite branding with dark theme support
 
@@ -55,7 +56,7 @@ The Bellwood ecosystem consists of five interconnected components:
 - **Authentication & Authorization:** JWT Bearer tokens with `admin` and `dispatcher` roles; secure authentication state provider with automatic token refresh; login/logout flow with protected routes.
 - **Booking Management:** Full booking list with filtering (All, Requested, Confirmed, Active, Completed, Cancelled); search by passenger name, location, booker; detailed booking view with passenger info, pickup/dropoff, assigned driver; driver assignment workflow with affiliate selection; booking cancellation support.
 - **Real-Time Status Updates:** SignalR subscription on all pages (Bookings, BookingDetail, LiveTracking); instant status changes without manual refresh (OnRoute, Arrived, PassengerOnboard); dual status display (`Status` for reports, `CurrentRideStatus` for real-time driver state); automatic filter updates when status changes.
-- **Quote Management:** View incoming quote requests; convert quotes to bookings; filter by status (Pending, Converted, Declined).
+- **Quote Management:** Complete quote workflow with detail view; interactive pricing and status management; filter by status (Submitted, InReview, Priced, Rejected, Closed); admin notes for internal tracking; customer notifications when quotes are priced; quick action buttons for common tasks; quote-to-booking conversion support.
 - **Affiliate & Driver Management:** View affiliate companies with driver lists; add new affiliates and drivers; assign drivers to bookings; driver UserUid linking to AuthServer for app access.
 
 ### Real-Time Tracking Features
@@ -89,6 +90,7 @@ Bellwood.AdminPortal/
 ?   ?   ?? BookingDetail.razor       # Booking details with live tracking
 ?   ?   ?? LiveTracking.razor        # Interactive tracking map + SignalR
 ?   ?   ?? Quotes.razor              # Quote requests list
+?   ?   ?? QuoteDetail.razor         # Quote detail with pricing and status management
 ?   ?   ?? Affiliates.razor          # Affiliate management
 ?   ?   ?? AffiliateDetail.razor     # Affiliate details + driver list
 ?   ?? App.razor                     # Root app component
@@ -102,9 +104,12 @@ Bellwood.AdminPortal/
 ?   ?? DriverTrackingService.cs      # SignalR client + location service
 ?   ?? IAffiliateService.cs          # Affiliate service interface
 ?   ?? AffiliateService.cs           # Affiliate/driver management service
+?   ?? IQuoteService.cs              # Quote service interface
+?   ?? QuoteService.cs               # Quote management service
 ?? Models/                            # Data Models
 ?   ?? DriverTrackingModels.cs       # LocationUpdate, ActiveRideLocationDto, etc.
 ?   ?? AffiliateModels.cs            # Affiliate and Driver DTOs
+?   ?? QuoteModels.cs                # Quote and UpdateQuote DTOs
 ?? Auth/                              # Authorization
 ?   ?? StaffAuthorizeAttribute.cs    # Custom authorize attribute
 ?? wwwroot/                           # Static Assets
@@ -121,6 +126,7 @@ Bellwood.AdminPortal/
 ?   ?? DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md # Complete tracking guide
 ?   ?? ADMINPORTAL_STATUS_TIMEZONE_INTEGRATION.md # Status + timezone fixes
 ?   ?? DRIVER_ASSIGNMENT_IMPLEMENTATION.md # Driver assignment workflow
+?   ?? QUOTE_MANAGEMENT_IMPLEMENTATION.md # Quote feature implementation guide
 ?   ?? QUICK_START.md                # Quick start guide
 ?   ?? [...].md                      # 20+ detailed docs
 ?? Scripts/                           # PowerShell Test Scripts
@@ -144,6 +150,7 @@ Bellwood.AdminPortal/
 - `Docs/ADMINPORTAL_REALTIME_STATUS_UPDATES.md` – LiveTracking page SignalR implementation
 - `Docs/ADMINPORTAL_STATUS_TIMEZONE_INTEGRATION.md` – Status persistence and timezone handling
 - `Docs/DRIVER_ASSIGNMENT_IMPLEMENTATION.md` – Driver assignment workflow
+- `Docs/QUOTE_MANAGEMENT_IMPLEMENTATION.md` – Complete quote management feature guide
 - `Docs/DRIVER_APP_COMPLETE_INTEGRATION_GUIDE.md` – Driver App integration reference
 
 ### Development Guides
@@ -321,11 +328,56 @@ curl -X POST https://localhost:5206/affiliates/seed -k
 
 **Features:**
 - View incoming quote requests
-- Filter by status (Pending, Converted, Declined)
-- Search by customer name
-- Convert quotes to bookings
+- Filter by status (All, Submitted, InReview, Priced, Rejected, Closed)
+- Search by passenger name, booker name, pickup/dropoff location
+- One-click navigation to quote details
+- Status badge indicators
+- Real-time quote count by status
 
 **Access**: Any authenticated user
+
+**Filters:**
+- **All** – Show all quote requests
+- **Submitted** – New quotes awaiting review
+- **InReview** – Quotes being processed by admin
+- **Priced** – Quotes with pricing ready for customer
+- **Rejected** – Declined quote requests
+- **Closed** – Completed/archived quotes
+
+**Search**: Passenger name, booker name, pickup location, dropoff location
+
+---
+
+### Quote Detail (`/quotes/{id}`)
+
+**Features:**
+- Complete quote request information
+- Booker and passenger contact details
+- Trip details (pickup, dropoff, vehicle class, passengers, luggage)
+- Special requests display
+- Interactive pricing form with currency formatting
+- Status management dropdown
+- Admin notes (internal only, not visible to customers)
+- Quick action buttons (Mark as Priced, Mark In Review, Reject)
+- Save/Reset functionality with validation
+- Success/error feedback messages
+- Automatic customer notification when status changes to "Priced"
+
+**Access**: Any authenticated user
+
+**Status Workflow:**
+1. **Submitted** – Initial state when quote request arrives
+2. **InReview** – Admin is processing the quote
+3. **Priced** – Price set and customer can view (triggers notification)
+4. **Rejected** – Quote declined by admin
+5. **Closed** – Quote completed/archived
+
+**Admin Actions:**
+- Set quoted price (decimal with $0.01 precision)
+- Update status to track quote progress
+- Add internal notes for team reference
+- View previous notes and update history
+- Use quick actions for common workflows
 
 ---
 
