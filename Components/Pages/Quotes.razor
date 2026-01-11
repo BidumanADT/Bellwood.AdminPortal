@@ -181,6 +181,15 @@
             Console.WriteLine("[Quotes] Fetching quotes from AdminAPI...");
             var response = await client.GetAsync("/quotes/list?take=100");
 
+            // Phase 1: Handle 403 Forbidden responses from AdminAPI
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                errorMessage = "Access denied. You don't have permission to view these quotes.";
+                Console.WriteLine($"[Quotes] 403 Forbidden: {errorMessage}");
+                allQuotes.Clear();
+                return;
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
@@ -194,6 +203,12 @@
             Console.WriteLine($"[Quotes] Loaded {allQuotes.Count} quotes");
 
             FilterQuotes(selectedFilter);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "Access denied. You don't have permission to view these quotes.";
+            Console.WriteLine($"[Quotes] 403 Forbidden: {errorMessage}");
+            allQuotes.Clear();
         }
         catch (HttpRequestException ex)
         {
@@ -279,5 +294,24 @@
         public string PickupLocation { get; set; } = "";
         public string? DropoffLocation { get; set; }
         public DateTime PickupDateTime { get; set; }
+        
+        // Phase 1: Audit trail fields (added January 2026)
+        /// <summary>
+        /// User ID (GUID) of the user who created this quote.
+        /// Null for legacy quotes created before Phase 1.
+        /// </summary>
+        public string? CreatedByUserId { get; set; }
+        
+        /// <summary>
+        /// User ID (GUID) of the user who last modified this quote.
+        /// Null if never modified or for legacy quotes.
+        /// </summary>
+        public string? ModifiedByUserId { get; set; }
+        
+        /// <summary>
+        /// Timestamp of the last modification to this quote.
+        /// Null if never modified.
+        /// </summary>
+        public DateTime? ModifiedOnUtc { get; set; }
     }
 }

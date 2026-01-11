@@ -24,6 +24,25 @@ public class QuoteDetailDto
     public string? AdminNotes { get; set; }
     public DateTime? UpdatedUtc { get; set; }
     public string? UpdatedBy { get; set; }
+    
+    // Phase 1: Audit trail fields (added January 2026)
+    /// <summary>
+    /// User ID (GUID) of the user who created this quote.
+    /// Null for legacy quotes created before Phase 1.
+    /// </summary>
+    public string? CreatedByUserId { get; set; }
+    
+    /// <summary>
+    /// User ID (GUID) of the user who last modified this quote.
+    /// Null if never modified or for legacy quotes.
+    /// </summary>
+    public string? ModifiedByUserId { get; set; }
+    
+    /// <summary>
+    /// Timestamp of the last modification to this quote.
+    /// Null if never modified.
+    /// </summary>
+    public DateTime? ModifiedOnUtc { get; set; }
 }
 
 /// <summary>

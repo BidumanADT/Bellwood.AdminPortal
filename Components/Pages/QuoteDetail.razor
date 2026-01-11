@@ -321,6 +321,13 @@
                 Console.WriteLine($"[QuoteDetail] Quote not found: {QuoteId}");
             }
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            // Phase 1: Handle 403 Forbidden from QuoteService
+            errorMessage = ex.Message;
+            Console.WriteLine($"[QuoteDetail] Access denied: {errorMessage}");
+            quote = null;
+        }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load quote: {ex.Message}";
@@ -359,6 +366,12 @@
 
             successMessage = "? Quote updated successfully! The customer will be notified if status is set to 'Priced'.";
             Console.WriteLine($"[QuoteDetail] Quote updated: {QuoteId}, Price: {quotedPrice}, Status: {selectedStatus}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // Phase 1: Handle 403 Forbidden from QuoteService
+            errorMessage = ex.Message;
+            Console.WriteLine($"[QuoteDetail] Access denied: {errorMessage}");
         }
         catch (Exception ex)
         {
