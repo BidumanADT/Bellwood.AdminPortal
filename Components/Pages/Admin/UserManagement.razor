@@ -301,6 +301,8 @@
                     userToUpdate.Role = newRole;
                 }
                 
+                // Auto-close modal after success
+                await Task.Delay(500); // Brief delay to show success
                 CancelRoleChange();
             }
             else

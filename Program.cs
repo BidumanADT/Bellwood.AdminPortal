@@ -8,8 +8,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Blazor-style auth
-builder.Services.AddAuthorizationCore();
+// Phase 2 Fix: Add authentication services for [Authorize] attribute support
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, 
+        BlazorAuthenticationHandler>("Blazor", options => { });
+
+// Blazor-style auth with policies
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
+    options.AddPolicy("StaffOnly", policy => policy.RequireRole("admin", "dispatcher"));
+});
 
 // Token store + auth state provider - MUST BE SINGLETON to persist across circuits
 builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
@@ -81,6 +90,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Phase 2 Fix: Add authentication middleware
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
