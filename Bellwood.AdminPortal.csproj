@@ -15,5 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="..\BellwoodMobileApp\BellwoodGlobal.Mobile\BellwoodGlobal.Core\BellwoodGlobal.Core.csproj" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <Folder Include="Docs\Temp\" />
+  </ItemGroup>
 
 </Project>

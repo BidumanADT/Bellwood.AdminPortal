@@ -1,8 +1,8 @@
 # Security Model & Authorization
 
 **Document Type**: Living Document - Technical Reference  
-**Last Updated**: January 17, 2026  
-**Status**: ? Production Ready
+**Last Updated**: January 18, 2026  
+**Status**: ? Production Ready (Phase 2 Complete)
 
 ---
 
@@ -677,8 +677,8 @@ protected override async Task OnInitializedAsync()
 - [x] HTTPS enforced in production
 - [x] API keys in configuration (not hardcoded)
 - [x] 403 errors handled with user-friendly messages
-- [ ] JWT decoding for role extraction (Phase 2)
-- [ ] Token refresh logic (Phase 2)
+- [x] JWT decoding for role extraction (Phase 2)
+- [x] Token refresh logic (Phase 2)
 
 ### Production
 
@@ -753,7 +753,7 @@ public async Task<string?> RefreshTokenIfNeededAsync()
 
     // Check if token is expiring soon
     var handler = new JwtSecurityTokenHandler();
-    var jsonToken = handler.ReadToken(token) as JwtSecurityToken;
+    var jsonToken = handler.ReadJwtToken(token);
     var exp = jsonToken?.ValidTo;
 
     if (exp.HasValue && exp.Value < DateTime.UtcNow.AddMinutes(5))
@@ -775,4 +775,382 @@ public async Task<string?> RefreshTokenIfNeededAsync()
 
     return token;
 }
+
+````````markdown
+## ? Phase 2 Security Enhancements (IMPLEMENTED - January 18, 2026)
+
+### JWT Token Decoding
+
+**Status**: ? **IMPLEMENTED**
+
+**Implementation**: `Services/JwtAuthenticationStateProvider.cs`
+
+```csharp
+using System.IdentityModel.Tokens.Jwt;
+
+private List<Claim> DecodeJwtToken(string token)
+{
+    var claims = new List<Claim>();
+    var handler = new JwtSecurityTokenHandler();
+    
+    if (!handler.CanReadToken(token))
+    {
+        Console.WriteLine("[AuthStateProvider] Token is not readable");
+        return claims;
+    }
+    
+    try
+    {
+        var jsonToken = handler.ReadJwtToken(token);
+        
+        // Extract claims
+        var username = jsonToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+        var role = jsonToken.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+        var userId = jsonToken.Claims.FirstOrDefault(c => c.Type == "userId")?.Value;
+        
+        // Add to ClaimsPrincipal
+        if (!string.IsNullOrEmpty(username))
+            claims.Add(new Claim(ClaimTypes.Name, username));
+        
+        if (!string.IsNullOrEmpty(role))
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        else
+            claims.Add(new Claim(ClaimTypes.Role, "Staff")); // Fallback
+        
+        if (!string.IsNullOrEmpty(userId))
+            claims.Add(new Claim("userId", userId));
+        
+        claims.Add(new Claim("access_token", token));
+        
+        Console.WriteLine($"[AuthStateProvider] Decoded - User: {username}, Role: {role}, UserId: {userId}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[AuthStateProvider] Failed to decode JWT: {ex.Message}");
+    }
+    
+    return claims;
+}
 ```
+
+**Benefits**:
+- ? Extracts actual role from JWT (admin, dispatcher, booker, driver)
+- ? Enables role-based UI logic via `<AuthorizeView Roles="admin">`
+- ? Access userId for audit logging
+- ? ClaimsPrincipal populated with real JWT claims
+
+**Library**: `System.IdentityModel.Tokens.Jwt` v8.0.0
+
+---
+
+### Automatic Token Refresh
+
+**Status**: ? **IMPLEMENTED**
+
+**Implementation**: `Services/TokenRefreshService.cs`
+
+**Features**:
+- ? Captures refresh token on login
+- ? Stores refresh token in memory (singleton)
+- ? Auto-refreshes 5 minutes before expiry
+- ? Refresh timer runs every 55 minutes
+- ? Updates authentication state with new token
+
+**Token Refresh Flow**:
+```csharp
+public async Task<bool> RefreshTokenAsync()
+{
+    var refreshToken = await _tokenProvider.GetRefreshTokenAsync();
+    if (string.IsNullOrEmpty(refreshToken))
+    {
+        _logger.LogWarning("[TokenRefresh] No refresh token available");
+        return false;
+    }
+    
+    var client = _httpFactory.CreateClient("AuthServer");
+    
+    var response = await client.PostAsJsonAsync("/connect/token", new
+    {
+        grant_type = "refresh_token",
+        refresh_token = refreshToken
+    });
+    
+    if (!response.IsSuccessStatusCode)
+    {
+        _logger.LogWarning("[TokenRefresh] Failed to refresh token");
+        return false;
+    }
+    
+    var result = await response.Content.ReadFromJsonAsync<TokenResponse>();
+    
+    // Update stored tokens
+    await _tokenProvider.SetTokenAsync(result.AccessToken);
+    if (!string.IsNullOrEmpty(result.RefreshToken))
+        await _tokenProvider.SetRefreshTokenAsync(result.RefreshToken);
+    
+    // Update authentication state
+    var handler = new JwtSecurityTokenHandler();
+    var jsonToken = handler.ReadJwtToken(result.AccessToken);
+    var username = jsonToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown";
+    
+    await _authStateProvider.MarkUserAsAuthenticatedAsync(username, result.AccessToken);
+    
+    _logger.LogInformation("[TokenRefresh] Token refreshed successfully");
+    return true;
+}
+```
+
+**Auto-Refresh Timer**:
+```csharp
+public async Task StartAutoRefreshAsync()
+{
+    var token = await _tokenProvider.GetTokenAsync();
+    var handler = new JwtSecurityTokenHandler();
+    var jsonToken = handler.ReadJwtToken(token);
+    var expiresAt = jsonToken.ValidTo;
+    
+    // Refresh 5 minutes before expiry
+    var refreshAt = expiresAt.AddMinutes(-5);
+    var timeUntilRefresh = refreshAt - DateTime.UtcNow;
+    
+    _logger.LogInformation($"[TokenRefresh] Token will be refreshed in {timeUntilRefresh.TotalMinutes:F1} minutes");
+    
+    _refreshTimer = new Timer(
+        async _ => await RefreshTokenAsync(),
+        null,
+        timeUntilRefresh,
+        TimeSpan.FromMinutes(55) // Refresh every 55 minutes thereafter
+    );
+}
+```
+
+**Security Benefits**:
+- ? Users don't lose session during long portal sessions
+- ? Token rotation reduces window of opportunity for token theft
+- ? Refresh tokens can be revoked server-side
+- ? Seamless user experience (no unexpected logouts)
+
+**Storage**: Refresh tokens stored in memory (singleton), cleared on logout
+
+---
+
+### Blazor Authentication Integration
+
+**Status**: ? **IMPLEMENTED**
+
+**Implementation**: `Services/BlazorAuthenticationHandler.cs`
+
+**Purpose**: Bridges Blazor Server's `AuthenticationStateProvider` with ASP.NET Core's authentication middleware, enabling `[Authorize]` attribute support on Razor pages.
+
+```csharp
+public class BlazorAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    private readonly AuthenticationStateProvider _authenticationStateProvider;
+
+    public BlazorAuthenticationHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        AuthenticationStateProvider authenticationStateProvider)
+        : base(options, logger, encoder)
+    {
+        _authenticationStateProvider = authenticationStateProvider;
+    }
+
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        try
+        {
+            // Get the authentication state from Blazor's AuthenticationStateProvider
+            var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            // If user is authenticated, return success
+            if (user?.Identity?.IsAuthenticated == true)
+            {
+                var ticket = new AuthenticationTicket(user, Scheme.Name);
+                return AuthenticateResult.Success(ticket);
+            }
+
+            // User is not authenticated
+            return AuthenticateResult.NoResult();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error authenticating user via Blazor authentication handler");
+            return AuthenticateResult.Fail(ex);
+        }
+    }
+}
+```
+
+**Registration** (`Program.cs`):
+```csharp
+// Add authentication services
+builder.Services.AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, BlazorAuthenticationHandler>("Blazor", options => { });
+
+// Add authorization policies
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
+    options.AddPolicy("StaffOnly", policy => policy.RequireRole("admin", "dispatcher"));
+});
+
+// ...
+
+var app = builder.Build();
+
+// Add authentication middleware
+app.UseAuthentication();
+app.UseAuthorization();
+```
+
+**Benefits**:
+- ? `[Authorize(Roles = "admin")]` attribute works on Razor pages
+- ? Proper 403 Forbidden responses for unauthorized access
+- ? ASP.NET Core authorization policies enforced
+- ? Blazor authentication integrated with HTTP context
+
+**Impact**: Fixed critical "InvalidOperationException: Unable to find IAuthenticationService" error
+
+---
+
+### Authorization Policies (Phase 2)
+
+**Status**: ? **IMPLEMENTED**
+
+**Policy Definitions**:
+
+```csharp
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole("admin"));
+
+    options.AddPolicy("StaffOnly", policy =>
+        policy.RequireRole("admin", "dispatcher"));
+});
+```
+
+**Policy Matrix** (Updated):
+
+| Policy | Roles | Use Case | Status |
+|--------|-------|----------|--------|
+| **AdminOnly** | admin | User management, billing, OAuth credentials | ? Implemented |
+| **StaffOnly** | admin, dispatcher | Operational features (bookings, quotes, affiliates) | ? Implemented |
+| **Authenticated** | All authenticated users | Basic portal access | ? Implemented |
+
+**Usage Examples**:
+
+**Page-Level**:
+```csharp
+@page "/admin/users"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+```
+
+**Component-Level**:
+```razor
+<AuthorizeView Roles="admin">
+    <Authorized>
+        <NavLink href="admin/users">User Management</NavLink>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="admin,dispatcher">
+    <Authorized>
+        <NavLink href="bookings">Bookings</NavLink>
+    </Authorized>
+</AuthorizeView>
+```
+
+---
+
+### Enhanced 403 Forbidden Handling
+
+**Status**: ? **IMPLEMENTED** (All Services)
+
+**Services with 403 Handling**:
+- ? `AffiliateService` - All methods
+- ? `QuoteService` - All methods
+- ? `UserManagementService` - All methods
+- ? `DriverTrackingService` - All methods
+
+**Pattern**:
+```csharp
+public async Task<List<UserDto>> GetAllUsersAsync(string? roleFilter = null)
+{
+    var client = await GetAuthorizedClientAsync();
+    var response = await client.GetAsync("/api/admin/users");
+    
+    // Phase 2: Handle 403 Forbidden
+    if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+    {
+        _logger.LogWarning("[Service] Access denied");
+        throw new UnauthorizedAccessException("Access denied. You do not have permission to access this resource.");
+    }
+    
+    response.EnsureSuccessStatusCode();
+    return await response.Content.ReadFromJsonAsync<List<UserDto>>() ?? new();
+}
+```
+
+**Benefits**:
+- ? User-friendly error messages
+- ? No raw HTTP status codes exposed
+- ? Consistent error handling across all services
+- ? Errors logged for debugging
+
+---
+
+### User Management Security
+
+**Status**: ? **IMPLEMENTED**
+
+**Features**:
+- ? Admin-only user list access
+- ? Admin-only role assignment
+- ? Role changes require confirmation
+- ? Dispatcher blocked from user management (403)
+
+**Access Control**:
+
+**Admin Users** (alice, bob):
+```
+? GET /api/admin/users - List all users
+? GET /api/admin/users?role=admin - Filter by role
+? PUT /api/admin/users/{username}/role - Change user role
+```
+
+**Dispatcher Users** (diana):
+```
+? GET /api/admin/users - 403 Forbidden
+? PUT /api/admin/users/{username}/role - 403 Forbidden
+```
+
+**Authorization Enforcement**:
+```csharp
+// UserManagementService.cs
+if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+{
+    _logger.LogWarning("[UserManagement] Access denied to user list");
+    throw new UnauthorizedAccessException("Access denied. You do not have permission to view users. Admin role required.");
+}
+```
+
+**UI Protection**:
+```razor
+<!-- UserManagement.razor -->
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+
+<AuthorizeView Roles="admin">
+    <Authorized>
+        <!-- User management UI -->
+    </Authorized>
+    <NotAuthorized>
+        <!-- Redirect to login -->
+    </NotAuthorized>
+</AuthorizeView>
+```
+
+---
