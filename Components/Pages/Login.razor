@@ -9,6 +9,7 @@
 @inject IHttpClientFactory HttpFactory
 @inject NavigationManager Navigation
 @inject JwtAuthenticationStateProvider AuthStateProvider
+@inject IAuthTokenProvider TokenProvider
 
 <PageTitle>Bellwood Elite - Staff Login</PageTitle>
 
@@ -59,7 +60,7 @@
 
                     <div class="text-center mt-3">
                         <small class="text-muted">
-                            Dev: alice/password or bob/password
+                            Dev: alice/password (admin), diana/password (dispatcher)
                         </small>
                     </div>
                 </div>
@@ -83,7 +84,7 @@
             Console.WriteLine($"[Login] Starting login for user: {loginModel.Username}");
             var client = HttpFactory.CreateClient("AuthServer");
 
-            // Call your Auth Server's login endpoint
+            // Call AuthServer's login endpoint
             var response = await client.PostAsJsonAsync("/api/auth/login", new
             {
                 username = loginModel.Username,
@@ -99,6 +100,13 @@
                 if (result?.AccessToken != null)
                 {
                     Console.WriteLine($"[Login] Token received, length: {result.AccessToken.Length}");
+                    
+                    // Store refresh token if provided (Phase 2.2)
+                    if (!string.IsNullOrEmpty(result.RefreshToken))
+                    {
+                        await StoreRefreshTokenAsync(result.RefreshToken);
+                        Console.WriteLine("[Login] Refresh token stored");
+                    }
                     
                     // Set the authentication state for Blazor
                     await AuthStateProvider.MarkUserAsAuthenticatedAsync(
@@ -133,6 +141,14 @@
         }
     }
 
+    private async Task StoreRefreshTokenAsync(string refreshToken)
+    {
+        // Store refresh token in session storage via JSInterop
+        // For now, just store in memory via TokenProvider
+        // TODO: Implement actual session storage persistence
+        await TokenProvider.SetRefreshTokenAsync(refreshToken);
+    }
+
     private class LoginModel
     {
         public string? Username { get; set; }
@@ -143,5 +159,6 @@
     {
         public string? AccessToken { get; set; }
         public string? RefreshToken { get; set; }
+        public int ExpiresIn { get; set; }  // Access token lifetime in seconds
     }
 }

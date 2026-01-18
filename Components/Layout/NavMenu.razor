@@ -12,8 +12,22 @@
         </a>
         <AuthorizeView>
             <Authorized>
-                <span class="text-white me-3">@context.User.Identity?.Name</span>
-                <a href="/logout" class="btn btn-sm btn-outline-light">Logout</a>
+                @{
+                    var username = context.User.Identity?.Name ?? "Unknown";
+                    var role = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+                    var roleClass = role.ToLower() switch
+                    {
+                        "admin" => "badge bg-danger",
+                        "dispatcher" => "badge bg-primary",
+                        "driver" => "badge bg-success",
+                        _ => "badge bg-secondary"
+                    };
+                }
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-white">@username</span>
+                    <span class="@roleClass">@role</span>
+                    <a href="/logout" class="btn btn-sm btn-outline-light">Logout</a>
+                </div>
             </Authorized>
         </AuthorizeView>
     </div>
@@ -23,30 +37,62 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="main" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="bookings">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Bookings
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="tracking">
-                <span class="bi bi-geo-alt-fill" aria-hidden="true"></span> Live Tracking
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="quotes">
-                <span class="bi bi-currency-dollar" aria-hidden="true"></span> Quotes
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="affiliates">
-                <span class="bi bi-people-fill" aria-hidden="true"></span> Affiliates
-            </NavLink>
-        </div>
+        <AuthorizeView Roles="admin,dispatcher">
+            <Authorized>
+                <!-- Operational Navigation (Staff) -->
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="main" Match="NavLinkMatch.All">
+                        <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="bookings">
+                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Bookings
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="tracking">
+                        <span class="bi bi-geo-alt-fill" aria-hidden="true"></span> Live Tracking
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="quotes">
+                        <span class="bi bi-currency-dollar" aria-hidden="true"></span> Quotes
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="affiliates">
+                        <span class="bi bi-people-fill" aria-hidden="true"></span> Affiliates
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        
+        <AuthorizeView Roles="admin">
+            <Authorized>
+                <!-- Admin-Only Section -->
+                <div class="nav-section-divider mt-3 mb-2 px-3">
+                    <hr style="border-color: rgba(255,255,255,0.2);" />
+                    <small class="text-muted" style="color: var(--bellwood-gold) !important;">
+                        <strong>ADMINISTRATION</strong>
+                    </small>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/users">
+                        <span class="bi bi-person-gear" aria-hidden="true"></span> User Management
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/credentials">
+                        <span class="bi bi-key-fill" aria-hidden="true"></span> OAuth Credentials
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/billing">
+                        <span class="bi bi-cash-stack" aria-hidden="true"></span> Billing Reports
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
     </nav>
 </div>

@@ -22,6 +22,9 @@ builder.Services.AddScoped<IQuoteService, QuoteService>();
 // Driver tracking service - scoped to allow per-circuit SignalR connections
 builder.Services.AddScoped<IDriverTrackingService, DriverTrackingService>();
 
+// Phase 2.2: Token refresh service - scoped per user session
+builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
+
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 
