@@ -1,0 +1,143 @@
+@page "/admin/billing"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+<PageTitle>Billing Reports - Bellwood Elite</PageTitle>
+
+<AuthorizeView Roles="admin">
+    <Authorized>
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="text-bellwood-gold">?? Billing Reports</h2>
+                    <p class="text-muted">Financial reports and analytics</p>
+                </div>
+            </div>
+
+            <!-- Coming Soon Notice -->
+            <div class="alert alert-info">
+                <h4 class="alert-heading">?? Feature Coming Soon</h4>
+                <p>
+                    Comprehensive billing reports and financial analytics will be available in a future release.
+                </p>
+                <hr />
+                <p class="mb-0">
+                    <strong>Planned Features:</strong>
+                </p>
+                <ul class="mb-0">
+                    <li>Revenue reports by date range</li>
+                    <li>Booking breakdown by affiliate</li>
+                    <li>Payment status tracking</li>
+                    <li>Commission calculations</li>
+                    <li>Export to Excel/PDF</li>
+                    <li>Monthly/quarterly summaries</li>
+                </ul>
+            </div>
+
+            <!-- Placeholder UI Preview -->
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card" style="opacity: 0.6;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Total Revenue (MTD)</h6>
+                            <h3 class="card-title">$12,450.00</h3>
+                            <p class="card-text">
+                                <small class="text-success">+15% vs last month</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card" style="opacity: 0.6;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Completed Bookings</h6>
+                            <h3 class="card-title">87</h3>
+                            <p class="card-text">
+                                <small class="text-success">+12% vs last month</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card" style="opacity: 0.6;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Pending Payments</h6>
+                            <h3 class="card-title">$3,200.00</h3>
+                            <p class="card-text">
+                                <small class="text-warning">14 invoices</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card" style="opacity: 0.6;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Average Booking Value</h6>
+                            <h3 class="card-title">$143.00</h3>
+                            <p class="card-text">
+                                <small class="text-muted">Based on 87 bookings</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Filters -->
+            <div class="card mt-4" style="opacity: 0.6;">
+                <div class="card-body">
+                    <h5 class="card-title">Generate Report</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Start Date:</label>
+                            <input type="date" class="form-control" disabled />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">End Date:</label>
+                            <input type="date" class="form-control" disabled />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Report Type:</label>
+                            <select class="form-select" disabled>
+                                <option>Revenue Summary</option>
+                                <option>Affiliate Breakdown</option>
+                                <option>Payment Status</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" disabled>
+                                ?? Generate Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Integration Notice -->
+            <div class="alert alert-warning mt-4">
+                <strong>For Developers:</strong>
+                This feature requires AdminAPI endpoints:
+                <ul class="mb-0">
+                    <li><code>GET /api/admin/reports/revenue</code> - Get revenue data</li>
+                    <li><code>GET /api/admin/reports/bookings</code> - Get booking analytics</li>
+                    <li><code>GET /api/admin/reports/payments</code> - Get payment status</li>
+                </ul>
+                These endpoints are planned for a future release.
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // Placeholder - no functionality yet
+}

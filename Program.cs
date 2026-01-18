@@ -25,6 +25,9 @@ builder.Services.AddScoped<IDriverTrackingService, DriverTrackingService>();
 // Phase 2.2: Token refresh service - scoped per user session
 builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
 
+// Phase 2.4: User management service
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 
