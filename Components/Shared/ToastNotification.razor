@@ -1,0 +1,102 @@
+@namespace Bellwood.AdminPortal.Components.Shared
+@inject IJSRuntime JS
+
+<!-- Toast container - positioned at top-right -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    @foreach (var toast in toasts)
+    {
+        <div class="toast show align-items-center text-white bg-@toast.Type border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <span class="bi bi-@GetIcon(toast.Type) me-2"></span>
+                    @toast.Message
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" 
+                        @onclick="() => RemoveToast(toast.Id)"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastMessage> toasts = new();
+    private int nextId = 1;
+
+    public void ShowSuccess(string message, int durationMs = 3000)
+    {
+        ShowToast(message, "success", durationMs);
+    }
+
+    public void ShowError(string message, int durationMs = 0) // Errors don't auto-hide
+    {
+        ShowToast(message, "danger", durationMs);
+    }
+
+    public void ShowWarning(string message, int durationMs = 5000)
+    {
+        ShowToast(message, "warning", durationMs);
+    }
+
+    public void ShowInfo(string message, int durationMs = 3000)
+    {
+        ShowToast(message, "info", durationMs);
+    }
+
+    private void ShowToast(string message, string type, int durationMs)
+    {
+        var toast = new ToastMessage
+        {
+            Id = nextId++,
+            Message = message,
+            Type = type
+        };
+
+        toasts.Add(toast);
+        StateHasChanged();
+
+        Console.WriteLine($"[Toast] {type}: {message}");
+
+        // Auto-remove after duration (if > 0)
+        if (durationMs > 0)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(durationMs);
+                await InvokeAsync(() =>
+                {
+                    RemoveToast(toast.Id);
+                    StateHasChanged();
+                });
+            });
+        }
+    }
+
+    private void RemoveToast(int id)
+    {
+        var toast = toasts.FirstOrDefault(t => t.Id == id);
+        if (toast != null)
+        {
+            toasts.Remove(toast);
+            StateHasChanged();
+        }
+    }
+
+    private string GetIcon(string type)
+    {
+        return type switch
+        {
+            "success" => "check-circle-fill",
+            "danger" => "exclamation-circle-fill",
+            "warning" => "exclamation-triangle-fill",
+            "info" => "info-circle-fill",
+            _ => "info-circle-fill"
+        };
+    }
+
+    private class ToastMessage
+    {
+        public int Id { get; set; }
+        public string Message { get; set; } = "";
+        public string Type { get; set; } = "info";
+    }
+}

@@ -6,6 +6,7 @@ namespace Bellwood.AdminPortal.Services;
 
 /// <summary>
 /// Service for managing users via AuthServer
+/// Phase 2: User management with role assignment
 /// </summary>
 public interface IUserManagementService
 {
@@ -89,7 +90,8 @@ public class UserManagementService : IUserManagementService
     }
 
     /// <summary>
-    /// Update a user's role
+    /// Update a user's role via AuthServer
+    /// Phase 2: Direct AuthServer call (no audit logging)
     /// </summary>
     public async Task<UpdateUserRoleResponse> UpdateUserRoleAsync(string username, string newRole)
     {

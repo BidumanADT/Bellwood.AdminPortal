@@ -4,10 +4,14 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Bellwood.AdminPortal.Models
 @using Bellwood.AdminPortal.Services
+@using Bellwood.AdminPortal.Components.Shared
 @inject IUserManagementService UserService
 @inject NavigationManager Navigation
 
 <PageTitle>User Management - Bellwood Elite</PageTitle>
+
+<!-- Phase 3: Toast Notifications -->
+<ToastNotification @ref="toast" />
 
 <AuthorizeView Roles="admin">
     <Authorized>
@@ -230,6 +234,9 @@
     private string? successMessage;
     private string? errorMessage;
 
+    // Phase 3: Toast notification reference
+    private ToastNotification? toast;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadUsersAsync();
@@ -249,11 +256,13 @@
         catch (UnauthorizedAccessException ex)
         {
             errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
             Console.WriteLine($"[UserManagement] Access denied: {ex.Message}");
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load users: {ex.Message}";
+            toast?.ShowError(errorMessage);
             Console.WriteLine($"[UserManagement] Error: {ex.Message}");
         }
         finally
@@ -293,6 +302,7 @@
             if (result.Success)
             {
                 successMessage = $"Role updated for {selectedUser.Username}. Change will take effect on next login.";
+                toast?.ShowSuccess(successMessage);
                 
                 // Update local user list
                 var userToUpdate = users.FirstOrDefault(u => u.Username == selectedUser.Username);
@@ -308,15 +318,18 @@
             else
             {
                 errorMessage = result.Message ?? "Failed to update role";
+                toast?.ShowError(errorMessage);
             }
         }
         catch (UnauthorizedAccessException ex)
         {
             errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to update role: {ex.Message}";
+            toast?.ShowError(errorMessage);
         }
         finally
         {

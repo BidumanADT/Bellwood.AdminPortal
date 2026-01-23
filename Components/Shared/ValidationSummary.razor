@@ -1,0 +1,36 @@
+@if (Errors != null && Errors.Any())
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <h6 class="alert-heading">
+            <span class="bi bi-exclamation-circle-fill me-2"></span>
+            Please correct the following errors:
+        </h6>
+        <ul class="mb-0">
+            @foreach (var error in Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+        @if (AllowDismiss)
+        {
+            <button type="button" class="btn-close" @onclick="Clear"></button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public List<string>? Errors { get; set; }
+
+    [Parameter]
+    public bool AllowDismiss { get; set; } = true;
+
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    private async Task Clear()
+    {
+        Errors?.Clear();
+        await OnClear.InvokeAsync();
+    }
+}

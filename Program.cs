@@ -37,6 +37,9 @@ builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
 // Phase 2.4: User management service
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 
+// Phase 3.1: Audit log service
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
 

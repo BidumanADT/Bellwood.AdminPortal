@@ -1,0 +1,399 @@
+@page "/admin/audit-logs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@using Bellwood.AdminPortal.Components.Shared
+@inject IAuditLogService AuditLogService
+@inject IJSRuntime JS
+
+<PageTitle>Audit Logs - Bellwood Admin Portal</PageTitle>
+
+<!-- Phase 3: Toast Notifications -->
+<ToastNotification @ref="toast" />
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h3>
+                <span class="bi bi-clipboard-data-fill text-primary"></span>
+                Audit Logs
+            </h3>
+            <p class="text-muted">View and analyze system activity and user actions</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-outline-primary" @onclick="ExportToCsv" disabled="@isExporting">
+                @if (isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    <text>Exporting...</text>
+                }
+                else
+                {
+                    <span class="bi bi-download me-2"></span>
+                    <text>Export to CSV</text>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Filters</h5>
+            <div class="row g-3">
+                <!-- Date Range -->
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" @bind="startDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" @bind="endDate" />
+                </div>
+
+                <!-- Action Type -->
+                <div class="col-md-2">
+                    <label class="form-label">Action</label>
+                    <select class="form-select" @bind="selectedAction">
+                        <option value="">All Actions</option>
+                        <option value="@AuditAction.BookingCreated">Booking Created</option>
+                        <option value="@AuditAction.BookingUpdated">Booking Updated</option>
+                        <option value="@AuditAction.QuoteCreated">Quote Created</option>
+                        <option value="@AuditAction.QuotePriced">Quote Priced</option>
+                        <option value="@AuditAction.UserRoleChanged">User Role Changed</option>
+                        <option value="@AuditAction.UserLogin">User Login</option>
+                        <option value="@AuditAction.DriverAssigned">Driver Assigned</option>
+                    </select>
+                </div>
+
+                <!-- Entity Type -->
+                <div class="col-md-2">
+                    <label class="form-label">Entity</label>
+                    <select class="form-select" @bind="selectedEntityType">
+                        <option value="">All Entities</option>
+                        <option value="@AuditEntityType.Booking">Booking</option>
+                        <option value="@AuditEntityType.Quote">Quote</option>
+                        <option value="@AuditEntityType.User">User</option>
+                        <option value="@AuditEntityType.Affiliate">Affiliate</option>
+                        <option value="@AuditEntityType.Driver">Driver</option>
+                        <option value="@AuditEntityType.System">System</option>
+                    </select>
+                </div>
+
+                <!-- User Filter -->
+                <div class="col-md-2">
+                    <label class="form-label">User</label>
+                    <input type="text" class="form-control" @bind="selectedUser" placeholder="Username or ID" />
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col">
+                    <button class="btn btn-primary" @onclick="ApplyFilters" disabled="@isLoading">
+                        <span class="bi bi-funnel-fill me-2"></span>
+                        Apply Filters
+                    </button>
+                    <button class="btn btn-outline-secondary ms-2" @onclick="ClearFilters">
+                        <span class="bi bi-x-circle me-2"></span>
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <span class="bi bi-exclamation-triangle-fill me-2"></span>
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading audit logs...</p>
+        </div>
+    }
+    else if (response == null || !response.Logs.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            <span class="bi bi-info-circle-fill me-2"></span>
+            <strong>No audit logs found</strong> for the selected filters. Try adjusting your date range or removing filters.
+        </div>
+    }
+    else
+    {
+        <!-- Results Table -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <strong>Showing @response.Pagination.Returned of @response.Pagination.Total logs</strong>
+                        <span class="text-muted ms-2">(Page @response.CurrentPage of @response.TotalPages)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Entity</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in response.Logs)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">
+                                        <small>@log.Timestamp.ToLocalTime().ToString("MM/dd/yyyy HH:mm:ss")</small>
+                                    </td>
+                                    <td>
+                                        <strong>@log.Username</strong>
+                                        <br />
+                                        <small class="text-muted">@log.UserRole</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-@GetActionColor(log.Action)">
+                                            @log.Action
+                                        </span>
+                                        <br />
+                                        <small class="text-muted">@log.HttpMethod @log.EndpointPath</small>
+                                    </td>
+                                    <td>
+                                        <strong>@log.EntityType</strong>
+                                        @if (!string.IsNullOrEmpty(log.EntityId))
+                                        {
+                                            <br />
+                                            <small class="text-muted">@log.EntityId</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-@GetResultColor(log.Result)">@log.Result</span>
+                                        @if (!string.IsNullOrEmpty(log.Details))
+                                        {
+                                            <br />
+                                            <small class="text-break">@log.Details</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@(log.IpAddress ?? "N/A")</small>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <nav aria-label="Audit log pagination">
+                    <ul class="pagination mb-0 justify-content-center">
+                        <li class="page-item @(response.HasPreviousPage ? "" : "disabled")">
+                            <button class="page-link" @onclick="() => GoToPage(response.CurrentPage - 1)" 
+                                    disabled="@(!response.HasPreviousPage)">
+                                Previous
+                            </button>
+                        </li>
+
+                        @for (int i = Math.Max(1, response.CurrentPage - 2); i <= Math.Min(response.TotalPages, response.CurrentPage + 2); i++)
+                        {
+                            var pageNum = i;
+                            <li class="page-item @(pageNum == response.CurrentPage ? "active" : "")">
+                                <button class="page-link" @onclick="() => GoToPage(pageNum)">
+                                    @pageNum
+                                </button>
+                            </li>
+                        }
+
+                        <li class="page-item @(response.HasNextPage ? "" : "disabled")">
+                            <button class="page-link" @onclick="() => GoToPage(response.CurrentPage + 1)" 
+                                    disabled="@(!response.HasNextPage)">
+                                Next
+                            </button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // Filter state
+    private DateTime? startDate = DateTime.Today.AddDays(-30); // Default: last 30 days
+    private DateTime? endDate = DateTime.Today;
+    private string selectedAction = "";
+    private string selectedEntityType = "";
+    private string selectedUser = "";
+
+    // UI state
+    private bool isLoading = false;
+    private bool isExporting = false;
+    private string? errorMessage;
+    private AuditLogResponse? response;
+
+    // Phase 3: Toast notification reference
+    private ToastNotification? toast;
+
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("[AuditLogs] Initializing audit log viewer");
+        await LoadLogsAsync();
+    }
+
+    private async Task ApplyFilters()
+    {
+        currentPage = 1; // Reset to first page when filters change
+        await LoadLogsAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        startDate = DateTime.Today.AddDays(-30);
+        endDate = DateTime.Today;
+        selectedAction = "";
+        selectedEntityType = "";
+        selectedUser = "";
+        currentPage = 1;
+        await LoadLogsAsync();
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            Console.WriteLine($"[AuditLogs] Loading logs - Page: {currentPage}");
+
+            var query = new AuditLogQuery
+            {
+                StartDate = startDate?.ToUniversalTime(),
+                EndDate = endDate?.ToUniversalTime().AddDays(1).AddSeconds(-1), // Include full end date
+                Action = string.IsNullOrWhiteSpace(selectedAction) ? null : selectedAction,
+                EntityType = string.IsNullOrWhiteSpace(selectedEntityType) ? null : selectedEntityType,
+                UserId = string.IsNullOrWhiteSpace(selectedUser) ? null : selectedUser,
+                Skip = (currentPage - 1) * pageSize,
+                Take = pageSize
+            };
+
+            response = await AuditLogService.GetAuditLogsAsync(query);
+
+            Console.WriteLine($"[AuditLogs] Loaded {response.Logs.Count} logs (Total: {response.Pagination.Total})");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+            Console.WriteLine($"[AuditLogs] Access denied: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load audit logs: {ex.Message}";
+            toast?.ShowError(errorMessage);
+            Console.WriteLine($"[AuditLogs] Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || (response != null && page > response.TotalPages))
+            return;
+
+        currentPage = page;
+        await LoadLogsAsync();
+    }
+
+    private async Task ExportToCsv()
+    {
+        isExporting = true;
+        errorMessage = null;
+
+        try
+        {
+            Console.WriteLine("[AuditLogs] Exporting to CSV");
+
+            var query = new AuditLogQuery
+            {
+                StartDate = startDate?.ToUniversalTime(),
+                EndDate = endDate?.ToUniversalTime().AddDays(1).AddSeconds(-1),
+                Action = string.IsNullOrWhiteSpace(selectedAction) ? null : selectedAction,
+                EntityType = string.IsNullOrWhiteSpace(selectedEntityType) ? null : selectedEntityType,
+                UserId = string.IsNullOrWhiteSpace(selectedUser) ? null : selectedUser
+            };
+
+            var csv = await AuditLogService.ExportAuditLogsToCsvAsync(query);
+
+            // Get count from CSV (rough estimate: lines - 1 for header)
+            var lineCount = csv.Split('\n').Length - 1;
+
+            // Download CSV file
+            var fileName = $"audit-logs-{DateTime.Now:yyyy-MM-dd-HHmmss}.csv";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("downloadFile", fileName, base64);
+
+            toast?.ShowSuccess($"Exported {lineCount} audit logs to {fileName}");
+            Console.WriteLine($"[AuditLogs] CSV exported: {fileName}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+            Console.WriteLine($"[AuditLogs] Export denied: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to export audit logs: {ex.Message}";
+            toast?.ShowError(errorMessage);
+            Console.WriteLine($"[AuditLogs] Export error: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private string GetActionColor(string action)
+    {
+        if (action.Contains("Created")) return "success";
+        if (action.Contains("Updated")) return "primary";
+        if (action.Contains("Deleted")) return "danger";
+        if (action.Contains("Login")) return "secondary";
+        if (action.Contains("Priced")) return "warning";
+        if (action.Contains("Assigned")) return "info";
+        return "secondary";
+    }
+
+    private string GetResultColor(string result)
+    {
+        return result switch
+        {
+            "Success" => "success",
+            "Failed" => "danger",
+            "Unauthorized" => "warning",
+            _ => "secondary"
+        };
+    }
+}
