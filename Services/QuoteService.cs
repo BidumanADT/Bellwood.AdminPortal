@@ -68,6 +68,12 @@ public class QuoteService : IQuoteService
         var client = await GetAuthorizedClientAsync();
         var response = await client.GetAsync($"/quotes/{id}");
         
+        // Phase 1: Handle 403 Forbidden responses
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new UnauthorizedAccessException("Access denied. You don't have permission to view this quote.");
+        }
+        
         if (!response.IsSuccessStatusCode)
         {
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -84,6 +90,12 @@ public class QuoteService : IQuoteService
     {
         var client = await GetAuthorizedClientAsync();
         var response = await client.PutAsJsonAsync($"/quotes/{id}", updateDto);
+        
+        // Phase 1: Handle 403 Forbidden responses
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            throw new UnauthorizedAccessException("Access denied. You don't have permission to update this quote.");
+        }
         
         if (!response.IsSuccessStatusCode)
         {

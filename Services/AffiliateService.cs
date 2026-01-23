@@ -20,15 +20,18 @@ public class AffiliateService : IAffiliateService
     private readonly IHttpClientFactory _httpFactory;
     private readonly IAuthTokenProvider _tokenProvider;
     private readonly IAdminApiKeyProvider _apiKeyProvider;
+    private readonly ILogger<AffiliateService> _logger;
 
     public AffiliateService(
         IHttpClientFactory httpFactory,
         IAuthTokenProvider tokenProvider,
-        IAdminApiKeyProvider apiKeyProvider)
+        IAdminApiKeyProvider apiKeyProvider,
+        ILogger<AffiliateService> logger)
     {
         _httpFactory = httpFactory;
         _tokenProvider = tokenProvider;
         _apiKeyProvider = apiKeyProvider;
+        _logger = logger;
     }
 
     private async Task<HttpClient> GetAuthorizedClientAsync()
@@ -57,6 +60,14 @@ public class AffiliateService : IAffiliateService
     {
         var client = await GetAuthorizedClientAsync();
         var response = await client.GetAsync("/affiliates/list");
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("[AffiliateService] Access denied to affiliates list");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to view affiliates.");
+        }
+        
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<AffiliateDto>>() ?? new();
     }
@@ -65,6 +76,13 @@ public class AffiliateService : IAffiliateService
     {
         var client = await GetAuthorizedClientAsync();
         var response = await client.GetAsync($"/affiliates/{id}");
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning($"[AffiliateService] Access denied to affiliate {id}");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to view this affiliate.");
+        }
         
         if (!response.IsSuccessStatusCode)
             return null;
@@ -89,6 +107,14 @@ public class AffiliateService : IAffiliateService
         };
         
         var response = await client.PostAsJsonAsync("/affiliates", createDto);
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("[AffiliateService] Access denied to create affiliate");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to create affiliates.");
+        }
+        
         response.EnsureSuccessStatusCode();
         
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
@@ -112,6 +138,14 @@ public class AffiliateService : IAffiliateService
         };
         
         var response = await client.PutAsJsonAsync($"/affiliates/{id}", updateDto);
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning($"[AffiliateService] Access denied to update affiliate {id}");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to update this affiliate.");
+        }
+        
         response.EnsureSuccessStatusCode();
     }
 
@@ -119,6 +153,14 @@ public class AffiliateService : IAffiliateService
     {
         var client = await GetAuthorizedClientAsync();
         var response = await client.DeleteAsync($"/affiliates/{id}");
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning($"[AffiliateService] Access denied to delete affiliate {id}");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to delete this affiliate.");
+        }
+        
         response.EnsureSuccessStatusCode();
     }
 
@@ -135,6 +177,13 @@ public class AffiliateService : IAffiliateService
         };
         
         var response = await client.PostAsJsonAsync($"/affiliates/{affiliateId}/drivers", driverPayload);
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning($"[AffiliateService] Access denied to add driver to affiliate {affiliateId}");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to add drivers.");
+        }
         
         if (!response.IsSuccessStatusCode)
         {
@@ -153,6 +202,14 @@ public class AffiliateService : IAffiliateService
         {
             driverId = driverId
         });
+        
+        // Phase 2.5: Handle 403 Forbidden
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning($"[AffiliateService] Access denied to assign driver to booking {bookingId}");
+            throw new UnauthorizedAccessException("Access denied. You do not have permission to assign drivers.");
+        }
+        
         response.EnsureSuccessStatusCode();
     }
 }

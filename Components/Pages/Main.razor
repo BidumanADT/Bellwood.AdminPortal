@@ -1,7 +1,10 @@
 ﻿@page "/main"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Services
 @inject NavigationManager Navigation
+@inject ITokenRefreshService TokenRefreshService
+@implements IAsyncDisposable
 
 <PageTitle>Bellwood Elite - Admin Portal</PageTitle>
 
@@ -62,19 +65,19 @@
                             </div>
                         </div>
 
-                        <!-- Dashboard Card (Future) -->
+                        <!-- Live Tracking Card -->
                         <div class="col-md-6 col-lg-4">
-                            <div class="card h-100 shadow-sm" style="opacity: 0.6;">
+                            <div class="card h-100 shadow-sm hover-card" style="cursor: pointer;" @onclick="NavigateToTracking">
                                 <div class="card-body text-center p-4">
                                     <div class="mb-3">
-                                        <span class="display-3">📊</span>
+                                        <span class="display-3">🗺️</span>
                                     </div>
-                                    <h3 class="card-title h4 mb-3">Dashboard</h3>
+                                    <h3 class="card-title h4 mb-3">Live Tracking</h3>
                                     <p class="card-text text-muted">
-                                        View metrics, analytics, and key performance indicators at a glance.
+                                        Monitor active rides in real-time with GPS tracking and driver status.
                                     </p>
-                                    <button class="btn btn-secondary mt-3" disabled>
-                                        Coming Soon
+                                    <button class="btn btn-primary mt-3">
+                                        View Map →
                                     </button>
                                 </div>
                             </div>
@@ -93,6 +96,9 @@
                                         </button>
                                         <button class="btn btn-outline-primary" @onclick="NavigateToQuotes">
                                             💰 View All Quotes
+                                        </button>
+                                        <button class="btn btn-outline-info" @onclick="NavigateToTracking">
+                                            🗺️ Live Tracking
                                         </button>
                                         <a href="/logout" class="btn btn-outline-danger">
                                             🚪 Logout
@@ -122,14 +128,35 @@
 </AuthorizeView>
 
 @code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Phase 2.2: Start automatic token refresh
+        await TokenRefreshService.StartAutoRefreshAsync();
+        Console.WriteLine("[Main] Token auto-refresh started");
+    }
+
     private void NavigateToBookings()
     {
         Console.WriteLine("[Main] Navigating to bookings");
         Navigation.NavigateTo("/bookings");
     }
+    
     private void NavigateToQuotes()
     {
         Console.WriteLine("[Main] Navigating to quotes");
         Navigation.NavigateTo("/quotes");
+    }
+    
+    private void NavigateToTracking()
+    {
+        Console.WriteLine("[Main] Navigating to live tracking");
+        Navigation.NavigateTo("/tracking");
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        // Clean up token refresh when page is disposed
+        TokenRefreshService.StopAutoRefresh();
+        await ValueTask.CompletedTask;
     }
 }

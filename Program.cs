@@ -8,8 +8,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Blazor-style auth
-builder.Services.AddAuthorizationCore();
+// Phase 2 Fix: Add authentication services for [Authorize] attribute support
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, 
+        BlazorAuthenticationHandler>("Blazor", options => { });
+
+// Blazor-style auth with policies
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
+    options.AddPolicy("StaffOnly", policy => policy.RequireRole("admin", "dispatcher"));
+});
 
 // Token store + auth state provider - MUST BE SINGLETON to persist across circuits
 builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
@@ -21,6 +30,15 @@ builder.Services.AddScoped<IQuoteService, QuoteService>();
 
 // Driver tracking service - scoped to allow per-circuit SignalR connections
 builder.Services.AddScoped<IDriverTrackingService, DriverTrackingService>();
+
+// Phase 2.2: Token refresh service - scoped per user session
+builder.Services.AddScoped<ITokenRefreshService, TokenRefreshService>();
+
+// Phase 2.4: User management service
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+
+// Phase 3.1: Audit log service
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // Register the concrete provider as singleton so it persists
 builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
@@ -75,6 +93,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Phase 2 Fix: Add authentication middleware
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

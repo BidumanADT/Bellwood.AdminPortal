@@ -139,28 +139,29 @@ Bellwood.AdminPortal/
 
 ## Documentation
 
-### Core Documentation
+> **Documentation has been reorganized!** (January 17, 2026)
+> 
+> All documentation now follows the [Bellwood Documentation Standard](Docs/BELLWOOD-DOCUMENTATION-STANDARD.md).
+> 
+> **Start here**: [Docs/00-README.md](Docs/00-README.md) - Complete documentation index
 
-- `Docs/PRODUCTION_DEPLOYMENT_READINESS.md` – Complete deployment guide with testing checklist
-- `Docs/DRIVER_TRACKING_ADMINPORTAL_IMPLEMENTATION.md` – Real-time tracking implementation details
-- `Docs/ADMINPORTAL_DASHBOARD_REALTIME_UPDATES.md` – SignalR dashboard integration guide
+### Quick Links
 
-### Feature Guides
+| Document | Description |
+|----------|-------------|
+| [00-README](Docs/00-README.md) | Complete documentation index & quick start |
+| [01-System-Architecture](Docs/01-System-Architecture.md) | Technical design & components |
+| [10-Real-Time-Tracking](Docs/10-Real-Time-Tracking.md) | GPS tracking & SignalR |
+| [13-User-Access-Control](Docs/13-User-Access-Control.md) | RBAC Phase 1 & 2 |
+| [20-API-Reference](Docs/20-API-Reference.md) | AdminAPI endpoints |
+| [30-Deployment-Guide](Docs/30-Deployment-Guide.md) | Build & deploy instructions |
+| [32-Troubleshooting](Docs/32-Troubleshooting.md) | Common issues & solutions |
 
-- `Docs/ADMINPORTAL_REALTIME_STATUS_UPDATES.md` – LiveTracking page SignalR implementation
-- `Docs/ADMINPORTAL_STATUS_TIMEZONE_INTEGRATION.md` – Status persistence and timezone handling
-- `Docs/DRIVER_ASSIGNMENT_IMPLEMENTATION.md` – Driver assignment workflow
-- `Docs/QUOTE_MANAGEMENT_IMPLEMENTATION.md` – Complete quote management feature guide
-- `Docs/DRIVER_APP_COMPLETE_INTEGRATION_GUIDE.md` – Driver App integration reference
+### All Documentation
 
-### Development Guides
+See [Docs/00-README.md](Docs/00-README.md) for the complete documentation library.
 
-- `Docs/QUICK_START.md` – Quick start for development
-- `Docs/ARCHITECTURE.md` – System architecture overview
-- `Docs/STAKEHOLDER_DEMO_GUIDE.md` – Demo walkthrough for stakeholders
-- `Docs/VISUAL_DESIGN_REFERENCE.md` – Bellwood branding guidelines
-
-**Total**: 20+ comprehensive documents (~25,000 words)
+**Historical Documentation**: Pre-reorganization docs are archived in [Docs/Archive/](Docs/Archive/) for reference.
 
 ## Prerequisites
 

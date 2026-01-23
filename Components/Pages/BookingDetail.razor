@@ -434,7 +434,25 @@
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            booking = await client.GetFromJsonAsync<BookingInfo>($"/bookings/{BookingId}");
+            var response = await client.GetAsync($"/bookings/{BookingId}");
+            
+            // Phase 1: Handle 403 Forbidden responses from AdminAPI
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                errorMessage = "Access denied. You don't have permission to view this booking.";
+                Console.WriteLine($"[BookingDetail] 403 Forbidden for booking {BookingId}");
+                booking = null;
+                return;
+            }
+            
+            response.EnsureSuccessStatusCode();
+            booking = await response.Content.ReadFromJsonAsync<BookingInfo>();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            errorMessage = "Access denied. You don't have permission to view this booking.";
+            Console.WriteLine($"[BookingDetail] 403 Forbidden: {errorMessage}");
+            booking = null;
         }
         catch (Exception ex)
         {
@@ -666,6 +684,25 @@
         /// to verify the driver can see this booking in the driver app.
         /// </summary>
         public string? AssignedDriverUid { get; set; }
+        
+        // Phase 1: Audit trail fields (added January 2026)
+        /// <summary>
+        /// User ID (GUID) of the user who created this booking.
+        /// Null for legacy bookings created before Phase 1.
+        /// </summary>
+        public string? CreatedByUserId { get; set; }
+        
+        /// <summary>
+        /// User ID (GUID) of the user who last modified this booking.
+        /// Null if never modified or for legacy bookings.
+        /// </summary>
+        public string? ModifiedByUserId { get; set; }
+        
+        /// <summary>
+        /// Timestamp of the last modification to this booking.
+        /// Null if never modified.
+        /// </summary>
+        public DateTime? ModifiedOnUtc { get; set; }
         
         /// <summary>
         /// Gets the display status - prefers CurrentRideStatus if set, otherwise falls back to Status

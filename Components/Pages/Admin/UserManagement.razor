@@ -1,0 +1,339 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using Bellwood.AdminPortal.Models
+@using Bellwood.AdminPortal.Services
+@using Bellwood.AdminPortal.Components.Shared
+@inject IUserManagementService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>User Management - Bellwood Elite</PageTitle>
+
+<!-- Phase 3: Toast Notifications -->
+<ToastNotification @ref="toast" />
+
+<AuthorizeView Roles="admin">
+    <Authorized>
+        <div class="container-fluid py-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2 class="text-bellwood-gold">?? User Management</h2>
+                    <p class="text-muted">Manage user accounts and role assignments</p>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success alert-dismissible fade show">
+                    ? @successMessage
+                    <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show">
+                    ? @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                </div>
+            }
+
+            <!-- Filters -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Filter by Role:</label>
+                    <select class="form-select" @bind="roleFilter" @bind:after="LoadUsersAsync">
+                        <option value="">All Roles</option>
+                        <option value="admin">Admins</option>
+                        <option value="dispatcher">Dispatchers</option>
+                        <option value="booker">Bookers</option>
+                        <option value="driver">Drivers</option>
+                    </select>
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <button class="btn btn-primary" @onclick="LoadUsersAsync" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        ?? Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-bellwood-gold" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading users...</p>
+                </div>
+            }
+            else if (!users.Any())
+            {
+                <div class="alert alert-info">
+                    No users found with the selected filters.
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            Users (@users.Count)
+                            @if (!string.IsNullOrEmpty(roleFilter))
+                            {
+                                <span class="text-muted">- @roleFilter only</span>
+                            }
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Current Role</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in users)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@user.Username</strong>
+                                                <br />
+                                                <small class="text-muted">@user.UserId</small>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(user.Email))
+                                                {
+                                                    @user.Email
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No email</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var badgeClass = user.Role.ToLower() switch
+                                                    {
+                                                        "admin" => "badge bg-danger",
+                                                        "dispatcher" => "badge bg-primary",
+                                                        "booker" => "badge bg-info",
+                                                        "driver" => "badge bg-success",
+                                                        _ => "badge bg-secondary"
+                                                    };
+                                                }
+                                                <span class="@badgeClass">@user.Role</span>
+                                            </td>
+                                            <td>
+                                                @if (user.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Inactive</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <small>@user.CreatedAt.ToLocalTime().ToString("MM/dd/yyyy")</small>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" 
+                                                        @onclick="() => ShowRoleChangeModal(user)">
+                                                    Change Role
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Role Change Modal -->
+            @if (selectedUser != null)
+            {
+                <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Change User Role</h5>
+                                <button type="button" class="btn-close" @onclick="CancelRoleChange"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>
+                                    <strong>User:</strong> @selectedUser.Username<br />
+                                    <strong>Current Role:</strong> <span class="badge bg-secondary">@selectedUser.Role</span>
+                                </p>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">New Role:</label>
+                                    <select class="form-select" @bind="newRole">
+                                        <option value="admin">Admin - Full system access</option>
+                                        <option value="dispatcher">Dispatcher - Operational access only</option>
+                                        <option value="booker">Booker - Create bookings/quotes</option>
+                                        <option value="driver">Driver - View assigned rides</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <strong>?? Important:</strong>
+                                    <ul class="mb-0">
+                                        <li>Role changes take effect on the user's next login</li>
+                                        <li>The user will need to refresh their token or re-login</li>
+                                        <li>Roles are mutually exclusive (one role per user)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CancelRoleChange">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn btn-primary" 
+                                        @onclick="ConfirmRoleChange" 
+                                        disabled="@(isUpdating || newRole == selectedUser.Role)">
+                                    @if (isUpdating)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    Update Role
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @{
+            Navigation.NavigateTo("/login");
+        }
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<UserDto> users = new();
+    private UserDto? selectedUser;
+    private string roleFilter = "";
+    private string newRole = "";
+    
+    private bool isLoading = false;
+    private bool isUpdating = false;
+    private string? successMessage;
+    private string? errorMessage;
+
+    // Phase 3: Toast notification reference
+    private ToastNotification? toast;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        
+        try
+        {
+            Console.WriteLine($"[UserManagement] Loading users with role filter: {roleFilter}");
+            users = await UserService.GetAllUsersAsync(string.IsNullOrEmpty(roleFilter) ? null : roleFilter);
+            Console.WriteLine($"[UserManagement] Loaded {users.Count} users");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+            Console.WriteLine($"[UserManagement] Access denied: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load users: {ex.Message}";
+            toast?.ShowError(errorMessage);
+            Console.WriteLine($"[UserManagement] Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowRoleChangeModal(UserDto user)
+    {
+        selectedUser = user;
+        newRole = user.Role;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CancelRoleChange()
+    {
+        selectedUser = null;
+        newRole = "";
+    }
+
+    private async Task ConfirmRoleChange()
+    {
+        if (selectedUser == null) return;
+
+        isUpdating = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            Console.WriteLine($"[UserManagement] Updating {selectedUser.Username} role to {newRole}");
+            
+            var result = await UserService.UpdateUserRoleAsync(selectedUser.Username, newRole);
+
+            if (result.Success)
+            {
+                successMessage = $"Role updated for {selectedUser.Username}. Change will take effect on next login.";
+                toast?.ShowSuccess(successMessage);
+                
+                // Update local user list
+                var userToUpdate = users.FirstOrDefault(u => u.Username == selectedUser.Username);
+                if (userToUpdate != null)
+                {
+                    userToUpdate.Role = newRole;
+                }
+                
+                // Auto-close modal after success
+                await Task.Delay(500); // Brief delay to show success
+                CancelRoleChange();
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to update role";
+                toast?.ShowError(errorMessage);
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to update role: {ex.Message}";
+            toast?.ShowError(errorMessage);
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+}

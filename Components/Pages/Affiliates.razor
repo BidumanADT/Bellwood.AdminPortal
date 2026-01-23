@@ -233,9 +233,16 @@
     private async Task LoadAffiliatesAsync()
     {
         isLoading = true;
+        errorMessage = null;
+        
         try
         {
             affiliates = await AffiliateService.GetAffiliatesAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            Console.WriteLine($"[Affiliates] Access denied: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -329,6 +336,10 @@
 
             CancelForm();
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+        }
         catch (Exception ex)
         {
             errorMessage = $"Failed to save affiliate: {ex.Message}";
@@ -364,6 +375,10 @@
             affiliates.Remove(deleteConfirmAffiliate);
             successMessage = $"Affiliate '{deleteConfirmAffiliate.Name}' deleted successfully.";
             deleteConfirmAffiliate = null;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
         }
         catch (Exception ex)
         {

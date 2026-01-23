@@ -1,0 +1,103 @@
+<!-- Phase 3: Reusable confirmation modal for destructive actions -->
+@if (isVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @if (ShowWarningIcon)
+                        {
+                            <span class="bi bi-exclamation-triangle-fill text-warning me-2"></span>
+                        }
+                        @Title
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="Cancel"></button>
+                </div>
+                <div class="modal-body">
+                    <p>@Message</p>
+                    
+                    @if (!string.IsNullOrEmpty(Details))
+                    {
+                        <div class="alert alert-info mt-3 mb-0">
+                            <small>@Details</small>
+                        </div>
+                    }
+
+                    @if (AdditionalContent != null)
+                    {
+                        <div class="mt-3">
+                            @AdditionalContent
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="Cancel">
+                        @CancelButtonText
+                    </button>
+                    <button type="button" class="btn @ConfirmButtonClass" @onclick="Confirm" disabled="@isConfirming">
+                        @if (isConfirming)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        @ConfirmButtonText
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Confirm Action";
+    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+    [Parameter] public string? Details { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+    [Parameter] public string ConfirmButtonText { get; set; } = "Confirm";
+    [Parameter] public string CancelButtonText { get; set; } = "Cancel";
+    [Parameter] public string ConfirmButtonClass { get; set; } = "btn-danger";
+    [Parameter] public bool ShowWarningIcon { get; set; } = true;
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private bool isVisible = false;
+    private bool isConfirming = false;
+
+    public void Show()
+    {
+        isVisible = true;
+        isConfirming = false;
+        StateHasChanged();
+        Console.WriteLine("[ConfirmationModal] Modal shown");
+    }
+
+    public void Hide()
+    {
+        isVisible = false;
+        isConfirming = false;
+        StateHasChanged();
+        Console.WriteLine("[ConfirmationModal] Modal hidden");
+    }
+
+    private async Task Confirm()
+    {
+        isConfirming = true;
+        Console.WriteLine("[ConfirmationModal] Confirmed");
+
+        try
+        {
+            await OnConfirm.InvokeAsync();
+        }
+        finally
+        {
+            Hide();
+        }
+    }
+
+    private async Task Cancel()
+    {
+        Console.WriteLine("[ConfirmationModal] Cancelled");
+        await OnCancel.InvokeAsync();
+        Hide();
+    }
+}

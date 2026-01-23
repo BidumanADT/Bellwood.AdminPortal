@@ -1,0 +1,78 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="error-boundary">
+    <ErrorBoundary @ref="errorBoundary">
+        <ChildContent>
+            @ChildContent
+        </ChildContent>
+        <ErrorContent Context="exception">
+            <div class="container mt-5">
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">
+                        <span class="bi bi-exclamation-triangle-fill me-2"></span>
+                        Something went wrong
+                    </h4>
+                    <p>An unexpected error occurred. This has been logged for investigation.</p>
+                    
+                    @if (ShowDetails)
+                    {
+                        <hr />
+                        <details>
+                            <summary class="fw-bold cursor-pointer">Error Details (for developers)</summary>
+                            <div class="mt-2">
+                                <p class="mb-1"><strong>Message:</strong> @exception.Message</p>
+                                <p class="mb-1"><strong>Type:</strong> @exception.GetType().Name</p>
+                                @if (!string.IsNullOrEmpty(exception.StackTrace))
+                                {
+                                    <p class="mb-0"><strong>Stack Trace:</strong></p>
+                                    <pre class="bg-light p-2 rounded" style="max-height: 300px; overflow-y: auto;">@exception.StackTrace</pre>
+                                }
+                            </div>
+                        </details>
+                    }
+
+                    <div class="mt-3">
+                        <button class="btn btn-primary" @onclick="Recover">
+                            <span class="bi bi-arrow-clockwise me-2"></span>
+                            Try Again
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" @onclick="GoHome">
+                            <span class="bi bi-house-door me-2"></span>
+                            Go to Home
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </ErrorContent>
+    </ErrorBoundary>
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public bool ShowDetails { get; set; } = false; // Only show in development
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private ErrorBoundary? errorBoundary;
+
+    private void Recover()
+    {
+        errorBoundary?.Recover();
+        Console.WriteLine("[ErrorBoundary] Attempting to recover from error");
+    }
+
+    private void GoHome()
+    {
+        Console.WriteLine("[ErrorBoundary] Navigating to home");
+        Navigation.NavigateTo("/main", forceLoad: true);
+    }
+
+    protected override void OnParametersSet()
+    {
+        errorBoundary?.Recover();
+    }
+}

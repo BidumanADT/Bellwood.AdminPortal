@@ -223,9 +223,16 @@
     private async Task LoadAffiliateAsync()
     {
         isLoading = true;
+        errorMessage = null;
+        
         try
         {
             affiliate = await AffiliateService.GetAffiliateAsync(AffiliateId);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            Console.WriteLine($"[AffiliateDetail] Access denied: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -287,6 +294,10 @@
                 : $" (Linked to AuthServer UID: {newDriver.UserUid})";
             successMessage = $"Driver '{newDriverName}' added successfully!{linkedMessage}";
             CancelAddForm();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
         }
         catch (Exception ex)
         {
