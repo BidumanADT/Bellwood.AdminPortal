@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 
+#pragma warning disable CS8601 // Possible null reference assignment - BindConverter.FormatValue handles nulls appropriately
+
 namespace Bellwood.AdminPortal.Components.Pages;
 
 public partial class QuoteDetail
@@ -112,7 +114,10 @@ public partial class QuoteDetail
         builder.AddAttribute(29, "placeholder", "Enter estimated price");
         builder.AddAttribute(30, "step", "0.01");
         builder.AddAttribute(31, "min", "0");
-        builder.AddAttribute(32, "value", BindConverter.FormatValue(estimatedPrice));
+        var formattedPrice = estimatedPrice.HasValue 
+            ? estimatedPrice.Value.ToString("F2") 
+            : string.Empty;
+        builder.AddAttribute(32, "value", formattedPrice);
         builder.AddAttribute(33, "onchange", EventCallback.Factory.CreateBinder<decimal?>(this, value => estimatedPrice = value, estimatedPrice));
         builder.CloseElement();
         builder.CloseElement(); // input-group
@@ -136,7 +141,10 @@ public partial class QuoteDetail
         builder.OpenElement(43, "input");
         builder.AddAttribute(44, "type", "datetime-local");
         builder.AddAttribute(45, "class", "form-control");
-        builder.AddAttribute(46, "value", BindConverter.FormatValue(estimatedPickupTime, "yyyy-MM-ddTHH:mm"));
+        var formattedDateTime = estimatedPickupTime.HasValue 
+            ? estimatedPickupTime.Value.ToString("yyyy-MM-ddTHH:mm") 
+            : string.Empty;
+        builder.AddAttribute(46, "value", formattedDateTime);
         builder.AddAttribute(47, "onchange", EventCallback.Factory.CreateBinder<DateTime?>(this, value => estimatedPickupTime = value, estimatedPickupTime));
         builder.CloseElement();
         

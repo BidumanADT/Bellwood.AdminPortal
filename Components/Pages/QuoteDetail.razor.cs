@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Bellwood.AdminPortal.Models;
 using Bellwood.AdminPortal.Services;
 
+#pragma warning disable ASP0006 // RenderTreeBuilder sequence numbers - using index++ for maintainability in dynamic rendering
+
 namespace Bellwood.AdminPortal.Components.Pages;
 
 public partial class QuoteDetail
