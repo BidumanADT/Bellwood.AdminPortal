@@ -31,25 +31,25 @@
                                 @onclick='() => FilterQuotes("All")'>
                             All (@allQuotes.Count)
                         </button>
-                        <button class="btn @(selectedFilter == "Submitted" ? "btn-info" : "btn-outline-secondary")"
-                                @onclick='() => FilterQuotes("Submitted")'>
-                            Submitted (@GetCountByStatus("Submitted"))
+                        <button class="btn @(selectedFilter == "Pending" ? "btn-info" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Pending")'>
+                            Pending (@GetCountByStatus("Pending"))
                         </button>
-                        <button class="btn @(selectedFilter == "InReview" ? "btn-warning" : "btn-outline-secondary")"
-                                @onclick='() => FilterQuotes("InReview")'>
-                            In Review (@GetCountByStatus("InReview"))
+                        <button class="btn @(selectedFilter == "Acknowledged" ? "btn-warning" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Acknowledged")'>
+                            Acknowledged (@GetCountByStatus("Acknowledged"))
                         </button>
-                        <button class="btn @(selectedFilter == "Priced" ? "btn-success" : "btn-outline-secondary")"
-                                @onclick='() => FilterQuotes("Priced")'>
-                            Priced (@GetCountByStatus("Priced"))
+                        <button class="btn @(selectedFilter == "Responded" ? "btn-success" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Responded")'>
+                            Responded (@GetCountByStatus("Responded"))
                         </button>
-                        <button class="btn @(selectedFilter == "Rejected" ? "btn-danger" : "btn-outline-secondary")"
-                                @onclick='() => FilterQuotes("Rejected")'>
-                            Rejected (@GetCountByStatus("Rejected"))
+                        <button class="btn @(selectedFilter == "Accepted" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Accepted")'>
+                            Accepted (@GetCountByStatus("Accepted"))
                         </button>
-                        <button class="btn @(selectedFilter == "Closed" ? "btn-secondary" : "btn-outline-secondary")"
-                                @onclick='() => FilterQuotes("Closed")'>
-                            Closed (@GetCountByStatus("Closed"))
+                        <button class="btn @(selectedFilter == "Cancelled" ? "btn-danger" : "btn-outline-secondary")"
+                                @onclick='() => FilterQuotes("Cancelled")'>
+                            Cancelled (@GetCountByStatus("Cancelled"))
                         </button>
                     </div>
                     <button class="btn btn-primary ms-3" @onclick="LoadQuotesAsync">
@@ -258,6 +258,11 @@
     {
         return status?.ToLowerInvariant() switch
         {
+            "pending" => "submitted",
+            "acknowledged" => "inreview",
+            "responded" => "priced",
+            "accepted" => "success",
+            "cancelled" => "rejected",
             "submitted" => "submitted",
             "inreview" => "inreview",
             "priced" => "priced",
@@ -271,8 +276,13 @@
     {
         return status switch
         {
+            "Pending" => "Pending",
+            "Acknowledged" => "Acknowledged",
+            "Responded" => "Responded",
+            "Accepted" => "Accepted",
+            "Cancelled" => "Cancelled",
             "InReview" => "In Review",
-            _ => status ?? "Submitted"
+            _ => status ?? "Pending"
         };
     }
 
