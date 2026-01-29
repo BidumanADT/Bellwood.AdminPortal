@@ -1,5 +1,7 @@
 ﻿@using System.Reflection;
 @using Bellwood.AdminPortal.Auth;
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
 
 <!DOCTYPE html>
 <html lang="en">
@@ -63,13 +65,4 @@
 </html>
 
 @code {
-    private class RedirectToLogin : ComponentBase
-    {
-        [Inject] private NavigationManager Navigation { get; set; } = default!;
-
-        protected override void OnInitialized()
-        {
-            Navigation.NavigateTo("/login");
-        }
-    }
 }

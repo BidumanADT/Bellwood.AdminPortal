@@ -43,6 +43,55 @@ public class QuoteDetailDto
     /// Null if never modified.
     /// </summary>
     public DateTime? ModifiedOnUtc { get; set; }
+    
+    // Phase B: Alpha test preparation fields (added January 2026)
+    /// <summary>
+    /// Timestamp when dispatcher acknowledged receipt of the quote.
+    /// Null if not yet acknowledged.
+    /// </summary>
+    public DateTime? AcknowledgedAt { get; set; }
+    
+    /// <summary>
+    /// User ID of the dispatcher who acknowledged the quote.
+    /// Null if not yet acknowledged.
+    /// </summary>
+    public string? AcknowledgedByUserId { get; set; }
+    
+    /// <summary>
+    /// Timestamp when dispatcher responded with price/ETA estimate.
+    /// Null if not yet responded.
+    /// </summary>
+    public DateTime? RespondedAt { get; set; }
+    
+    /// <summary>
+    /// User ID of the dispatcher who responded to the quote.
+    /// Null if not yet responded.
+    /// </summary>
+    public string? RespondedByUserId { get; set; }
+    
+    /// <summary>
+    /// Estimated price provided by dispatcher (placeholder until Limo Anywhere integration).
+    /// Null if not yet provided.
+    /// </summary>
+    public decimal? EstimatedPrice { get; set; }
+    
+    /// <summary>
+    /// Estimated pickup time provided by dispatcher (placeholder).
+    /// Null if not yet provided.
+    /// </summary>
+    public DateTime? EstimatedPickupTime { get; set; }
+    
+    /// <summary>
+    /// Notes added during quote lifecycle (acknowledge/respond).
+    /// Distinct from AdminNotes for workflow tracking.
+    /// </summary>
+    public string? Notes { get; set; }
+    
+    /// <summary>
+    /// Booking ID if this quote was accepted and converted to a booking.
+    /// Null if quote not yet accepted or was rejected/cancelled.
+    /// </summary>
+    public string? BookingId { get; set; }
 }
 
 /// <summary>
@@ -53,4 +102,36 @@ public class UpdateQuoteDto
     public decimal? QuotedPrice { get; set; }
     public string? Status { get; set; }
     public string? AdminNotes { get; set; }
+}
+
+/// <summary>
+/// DTO for acknowledging a quote (Phase B)
+/// </summary>
+public class AcknowledgeQuoteDto
+{
+    /// <summary>
+    /// Optional notes from dispatcher acknowledging the quote
+    /// </summary>
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// DTO for responding to a quote with price/ETA estimate (Phase B)
+/// </summary>
+public class RespondToQuoteDto
+{
+    /// <summary>
+    /// Estimated price (placeholder until Limo Anywhere integration)
+    /// </summary>
+    public decimal EstimatedPrice { get; set; }
+    
+    /// <summary>
+    /// Estimated pickup time (placeholder)
+    /// </summary>
+    public DateTime EstimatedPickupTime { get; set; }
+    
+    /// <summary>
+    /// Optional notes explaining the estimate
+    /// </summary>
+    public string? Notes { get; set; }
 }
