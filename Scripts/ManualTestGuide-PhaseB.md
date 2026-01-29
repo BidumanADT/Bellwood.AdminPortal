@@ -107,25 +107,24 @@ This guide provides step-by-step instructions for manually testing the Phase B q
 
 ### Test 3: Acknowledged Quote - Price/ETA Response
 
-**Objective**: Verify dispatcher can enter price and ETA estimates
+**Objective**: Verify dispatcher can enter price estimates
 
 **Steps**:
 1. On quote detail page (after acknowledgment from Test 2)
-2. **Verify**: Right panel shows "? Quote Acknowledged - Enter Estimate" with:
+2. **Verify**: Right panel shows "? Quote Acknowledged - Enter Price Estimate" with:
    - ? Yellow warning card styling
    - ? Warning message: "?? Placeholder Estimates"
-   - ? Warning text: "These are manual estimates until Limo Anywhere integration..."
+   - ? Warning text: "This is a manual price estimate until Limo Anywhere integration..."
+   - ? "Requested Pickup Time" displayed (read-only, taken from quote)
    - ? "Estimated Price ($)" input with $ prefix
-   - ? "Estimated Pickup Time" datetime-local input
    - ? "Response Notes (Optional)" textarea
    - ? "?? Send Response to Customer" button (disabled initially)
 
 3. Enter test values:
    - **Estimated Price**: `125.50`
-   - **Estimated Pickup Time**: Tomorrow at 2:00 PM
    - **Response Notes**: "Estimate based on standard route pricing"
 
-4. **Verify**: "Send Response" button becomes enabled
+4. **Verify**: "Send Response" button becomes enabled (no pickup time needed)
 5. Click **Send Response to Customer** button
 6. **Verify**: Success message: "Response sent to customer with estimate: $125.50"
 7. **Verify**: Page updates to show "Responded" panel
@@ -133,8 +132,10 @@ This guide provides step-by-step instructions for manually testing the Phase B q
 **Expected Result**: ? Response sent successfully, UI shows read-only response summary
 
 **Common Issues**:
-- ? Button stays disabled: Ensure both price and pickup time are filled
-- ? Validation error: Check that price is >= 0 and pickup time is future date
+- ? Button stays disabled: Ensure price is filled (pickup time no longer required)
+- ? Validation error: Check that price is >= 0
+
+**Note**: The pickup time is automatically taken from the customer's original quote request - no manual entry needed!
 
 ---
 
@@ -149,7 +150,7 @@ This guide provides step-by-step instructions for manually testing the Phase B q
    - ? Message: "The customer has been provided with the following estimate..."
    - ? Estimated Price displayed with green styling: "$125.50"
    - ? Yellow "Placeholder" badge next to price
-   - ? Estimated Pickup Time displayed
+   - ? Requested Pickup Time displayed (same as customer's original request)
    - ? Response Notes displayed
    - ? Info alert: "?? Next Steps: The customer will accept or cancel..."
 
@@ -160,6 +161,8 @@ This guide provides step-by-step instructions for manually testing the Phase B q
    - ? "Workflow Notes" section with response notes
 
 **Expected Result**: ? Dispatcher can review response but cannot edit while waiting
+
+**Note**: The pickup time shown is the customer's original requested time, not an estimate.
 
 ---
 

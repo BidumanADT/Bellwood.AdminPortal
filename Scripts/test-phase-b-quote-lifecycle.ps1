@@ -243,10 +243,10 @@ Write-Host ""
 
 Write-Host "  3. After acknowledging, verify Acknowledged panel appears" -ForegroundColor Cyan
 Write-Host "     ? Verify placeholder warning: '?? Placeholder Estimates' is visible" -ForegroundColor White
+Write-Host "     ? Verify 'Requested Pickup Time' is displayed (read-only from quote)" -ForegroundColor White
 Write-Host "     ? Verify 'Estimated Price' input field exists" -ForegroundColor White
-Write-Host "     ? Verify 'Estimated Pickup Time' datetime picker exists" -ForegroundColor White
 Write-Host "     ? Verify 'Response Notes' textarea exists" -ForegroundColor White
-Write-Host "     ? Enter test values (e.g., Price: 150.00, Pickup: tomorrow)" -ForegroundColor White
+Write-Host "     ? Enter test price (e.g., Price: 150.00)" -ForegroundColor White
 Write-Host "     ? Click 'Send Response to Customer' button" -ForegroundColor White
 Write-Host "     ? Verify success message appears" -ForegroundColor White
 Write-Host ""
@@ -254,7 +254,7 @@ Write-Host ""
 Write-Host "  4. After responding, verify Responded panel appears" -ForegroundColor Cyan
 Write-Host "     ? Verify 'Response Sent - Awaiting Customer' header" -ForegroundColor White
 Write-Host "     ? Verify estimated price is displayed with 'Placeholder' badge" -ForegroundColor White
-Write-Host "     ? Verify estimated pickup time is displayed" -ForegroundColor White
+Write-Host "     ? Verify requested pickup time is displayed (same as customer requested)" -ForegroundColor White
 Write-Host "     ? Verify response notes are shown" -ForegroundColor White
 Write-Host "     ? Verify 'Next Steps' message about customer acceptance" -ForegroundColor White
 Write-Host ""

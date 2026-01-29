@@ -50,7 +50,7 @@ public partial class QuoteDetail
     
     private async Task RespondToQuote()
     {
-        if (quote == null || !estimatedPrice.HasValue || !estimatedPickupTime.HasValue) return;
+        if (quote == null || !estimatedPrice.HasValue) return;
 
         isSaving = true;
         errorMessage = null;
@@ -61,7 +61,7 @@ public partial class QuoteDetail
             var dto = new RespondToQuoteDto
             {
                 EstimatedPrice = estimatedPrice.Value,
-                EstimatedPickupTime = estimatedPickupTime.Value,
+                EstimatedPickupTime = quote.PickupDateTime, // Use the customer's requested pickup time
                 Notes = string.IsNullOrWhiteSpace(responseNotes) ? null : responseNotes
             };
 

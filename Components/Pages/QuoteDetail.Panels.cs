@@ -74,7 +74,7 @@ public partial class QuoteDetail
         builder.AddAttribute(3, "class", "card-header bg-warning text-dark");
         builder.OpenElement(4, "h5");
         builder.AddAttribute(5, "class", "mb-0");
-        builder.AddContent(6, "? Quote Acknowledged - Enter Estimate");
+        builder.AddContent(6, "? Quote Acknowledged - Enter Price Estimate");
         builder.CloseElement();
         builder.CloseElement();
         
@@ -88,105 +88,92 @@ public partial class QuoteDetail
         builder.CloseElement();
         builder.OpenElement(13, "br");
         builder.CloseElement();
-        builder.AddContent(14, "These are manual estimates until Limo Anywhere integration is complete. Clearly label them as approximate when communicating with customers.");
+        builder.AddContent(14, "This is a manual price estimate until Limo Anywhere integration is complete. Clearly label it as approximate when communicating with customers.");
+        builder.CloseElement();
+        
+        // Display requested pickup time (read-only)
+        builder.OpenElement(15, "div");
+        builder.AddAttribute(16, "class", "mb-3 p-3");
+        builder.AddAttribute(17, "style", "background: rgba(203, 161, 53, 0.1); border-radius: 8px;");
+        builder.OpenElement(18, "strong");
+        builder.AddContent(19, "Requested Pickup Time:");
+        builder.CloseElement();
+        builder.OpenElement(20, "span");
+        builder.AddAttribute(21, "class", "ms-2");
+        builder.AddContent(22, quote?.PickupDateTime.ToLocalTime().ToString("g") ?? "Not specified");
+        builder.CloseElement();
         builder.CloseElement();
         
         // Estimated Price
-        builder.OpenElement(15, "div");
-        builder.AddAttribute(16, "class", "mb-3");
-        builder.OpenElement(17, "label");
-        builder.AddAttribute(18, "class", "form-label");
-        builder.OpenElement(19, "strong");
-        builder.AddContent(20, "Estimated Price ($)");
+        builder.OpenElement(23, "div");
+        builder.AddAttribute(24, "class", "mb-3");
+        builder.OpenElement(25, "label");
+        builder.AddAttribute(26, "class", "form-label");
+        builder.OpenElement(27, "strong");
+        builder.AddContent(28, "Estimated Price ($)");
         builder.CloseElement();
         builder.CloseElement();
         
-        builder.OpenElement(21, "div");
-        builder.AddAttribute(22, "class", "input-group");
-        builder.OpenElement(23, "span");
-        builder.AddAttribute(24, "class", "input-group-text");
-        builder.AddContent(25, "$");
+        builder.OpenElement(29, "div");
+        builder.AddAttribute(30, "class", "input-group");
+        builder.OpenElement(31, "span");
+        builder.AddAttribute(32, "class", "input-group-text");
+        builder.AddContent(33, "$");
         builder.CloseElement();
         
-        builder.OpenElement(26, "input");
-        builder.AddAttribute(27, "type", "number");
-        builder.AddAttribute(28, "class", "form-control");
-        builder.AddAttribute(29, "placeholder", "Enter estimated price");
-        builder.AddAttribute(30, "step", "0.01");
-        builder.AddAttribute(31, "min", "0");
+        builder.OpenElement(34, "input");
+        builder.AddAttribute(35, "type", "number");
+        builder.AddAttribute(36, "class", "form-control");
+        builder.AddAttribute(37, "placeholder", "Enter estimated price");
+        builder.AddAttribute(38, "step", "0.01");
+        builder.AddAttribute(39, "min", "0");
         var formattedPrice = estimatedPrice.HasValue 
             ? estimatedPrice.Value.ToString("F2") 
             : string.Empty;
-        builder.AddAttribute(32, "value", formattedPrice);
-        builder.AddAttribute(33, "onchange", EventCallback.Factory.CreateBinder<decimal?>(this, value => estimatedPrice = value, estimatedPrice));
+        builder.AddAttribute(40, "value", formattedPrice);
+        builder.AddAttribute(41, "onchange", EventCallback.Factory.CreateBinder<decimal?>(this, value => estimatedPrice = value, estimatedPrice));
         builder.CloseElement();
         builder.CloseElement(); // input-group
         
-        builder.OpenElement(34, "small");
-        builder.AddAttribute(35, "class", "text-muted");
-        builder.AddContent(36, "This is a placeholder estimate pending Limo Anywhere integration");
-        builder.CloseElement();
-        builder.CloseElement(); // mb-3
-        
-        // Estimated Pickup Time
-        builder.OpenElement(37, "div");
-        builder.AddAttribute(38, "class", "mb-3");
-        builder.OpenElement(39, "label");
-        builder.AddAttribute(40, "class", "form-label");
-        builder.OpenElement(41, "strong");
-        builder.AddContent(42, "Estimated Pickup Time");
-        builder.CloseElement();
-        builder.CloseElement();
-        
-        builder.OpenElement(43, "input");
-        builder.AddAttribute(44, "type", "datetime-local");
-        builder.AddAttribute(45, "class", "form-control");
-        var formattedDateTime = estimatedPickupTime.HasValue 
-            ? estimatedPickupTime.Value.ToString("yyyy-MM-ddTHH:mm") 
-            : string.Empty;
-        builder.AddAttribute(46, "value", formattedDateTime);
-        builder.AddAttribute(47, "onchange", EventCallback.Factory.CreateBinder<DateTime?>(this, value => estimatedPickupTime = value, estimatedPickupTime));
-        builder.CloseElement();
-        
-        builder.OpenElement(48, "small");
-        builder.AddAttribute(49, "class", "text-muted");
-        builder.AddContent(50, "Approximate pickup time for this booking");
+        builder.OpenElement(42, "small");
+        builder.AddAttribute(43, "class", "text-muted");
+        builder.AddContent(44, "This is a placeholder estimate pending Limo Anywhere integration");
         builder.CloseElement();
         builder.CloseElement(); // mb-3
         
         // Response Notes
-        builder.OpenElement(51, "div");
-        builder.AddAttribute(52, "class", "mb-3");
-        builder.OpenElement(53, "label");
-        builder.AddAttribute(54, "class", "form-label");
-        builder.OpenElement(55, "strong");
-        builder.AddContent(56, "Response Notes (Optional)");
+        builder.OpenElement(45, "div");
+        builder.AddAttribute(46, "class", "mb-3");
+        builder.OpenElement(47, "label");
+        builder.AddAttribute(48, "class", "form-label");
+        builder.OpenElement(49, "strong");
+        builder.AddContent(50, "Response Notes (Optional)");
         builder.CloseElement();
         builder.CloseElement();
         
-        builder.OpenElement(57, "textarea");
-        builder.AddAttribute(58, "class", "form-control");
-        builder.AddAttribute(59, "rows", 3);
-        builder.AddAttribute(60, "placeholder", "Explain pricing, add special instructions...");
-        builder.AddAttribute(61, "value", BindConverter.FormatValue(responseNotes));
-        builder.AddAttribute(62, "onchange", EventCallback.Factory.CreateBinder(this, value => responseNotes = value, responseNotes));
+        builder.OpenElement(51, "textarea");
+        builder.AddAttribute(52, "class", "form-control");
+        builder.AddAttribute(53, "rows", 3);
+        builder.AddAttribute(54, "placeholder", "Explain pricing, add special instructions...");
+        builder.AddAttribute(55, "value", BindConverter.FormatValue(responseNotes));
+        builder.AddAttribute(56, "onchange", EventCallback.Factory.CreateBinder(this, value => responseNotes = value, responseNotes));
         builder.CloseElement();
         builder.CloseElement(); // mb-3
         
         // Send Response Button
-        builder.OpenElement(63, "button");
-        builder.AddAttribute(64, "class", "btn btn-warning w-100");
-        builder.AddAttribute(65, "onclick", EventCallback.Factory.Create(this, RespondToQuote));
-        builder.AddAttribute(66, "disabled", isSaving || !estimatedPrice.HasValue || !estimatedPickupTime.HasValue);
+        builder.OpenElement(57, "button");
+        builder.AddAttribute(58, "class", "btn btn-warning w-100");
+        builder.AddAttribute(59, "onclick", EventCallback.Factory.Create(this, RespondToQuote));
+        builder.AddAttribute(60, "disabled", isSaving || !estimatedPrice.HasValue);
         
         if (isSaving)
         {
-            builder.OpenElement(67, "span");
-            builder.AddAttribute(68, "class", "spinner-border spinner-border-sm me-2");
+            builder.OpenElement(61, "span");
+            builder.AddAttribute(62, "class", "spinner-border spinner-border-sm me-2");
             builder.CloseElement();
         }
         
-        builder.AddContent(69, "?? Send Response to Customer");
+        builder.AddContent(63, "?? Send Response to Customer");
         builder.CloseElement(); // button
         
         builder.CloseElement(); // card-body
@@ -236,9 +223,9 @@ public partial class QuoteDetail
         builder.OpenElement(25, "div");
         builder.AddAttribute(26, "class", "mb-2");
         builder.OpenElement(27, "strong");
-        builder.AddContent(28, "Estimated Pickup:");
+        builder.AddContent(28, "Requested Pickup:");
         builder.CloseElement();
-        builder.AddContent(29, $" {quote?.EstimatedPickupTime?.ToLocalTime().ToString("g") ?? "Not specified"}");
+        builder.AddContent(29, $" {quote?.PickupDateTime.ToLocalTime().ToString("g")}");
         builder.CloseElement();
         
         if (!string.IsNullOrEmpty(quote?.Notes))
