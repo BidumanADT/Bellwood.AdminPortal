@@ -4,35 +4,42 @@ using System.Net.Http.Json;
 
 namespace Bellwood.AdminPortal.Services;
 
-/// <summary>
-/// Service for managing users via AuthServer
-/// Phase 2: User management with role assignment
-/// </summary>
 public interface IUserManagementService
 {
-    Task<List<UserDto>> GetAllUsersAsync(string? roleFilter = null);
-    Task<UpdateUserRoleResponse> UpdateUserRoleAsync(string username, string newRole);
+    Task<List<UserDto>> GetUsersAsync(int take = 50, int skip = 0);
+    Task<UserActionResult> CreateUserAsync(CreateUserRequest request);
+    Task<UserActionResult> UpdateUserRolesAsync(string id, List<string> roles);
+    Task<UserActionResult> SetUserDisabledAsync(string id, bool isDisabled);
 }
 
 public class UserManagementService : IUserManagementService
 {
     private readonly IHttpClientFactory _httpFactory;
     private readonly IAuthTokenProvider _tokenProvider;
+    private readonly IAdminApiKeyProvider _apiKeyProvider;
     private readonly ILogger<UserManagementService> _logger;
 
     public UserManagementService(
         IHttpClientFactory httpFactory,
         IAuthTokenProvider tokenProvider,
+        IAdminApiKeyProvider apiKeyProvider,
         ILogger<UserManagementService> logger)
     {
         _httpFactory = httpFactory;
         _tokenProvider = tokenProvider;
+        _apiKeyProvider = apiKeyProvider;
         _logger = logger;
     }
 
     private async Task<HttpClient> GetAuthorizedClientAsync()
     {
-        var client = _httpFactory.CreateClient("AuthServer");
+        var client = _httpFactory.CreateClient("AdminAPI");
+
+        var apiKey = _apiKeyProvider.GetApiKey();
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Admin-ApiKey", apiKey);
+        }
 
         // Attach JWT token
         var token = await _tokenProvider.GetTokenAsync();
@@ -45,37 +52,30 @@ public class UserManagementService : IUserManagementService
         return client;
     }
 
-    /// <summary>
-    /// Get all users from AuthServer
-    /// </summary>
-    public async Task<List<UserDto>> GetAllUsersAsync(string? roleFilter = null)
+    public async Task<List<UserDto>> GetUsersAsync(int take = 50, int skip = 0)
     {
         try
         {
             var client = await GetAuthorizedClientAsync();
-            
-            var url = "/api/admin/users";
-            if (!string.IsNullOrEmpty(roleFilter))
-            {
-                url += $"?role={Uri.EscapeDataString(roleFilter)}";
-            }
 
-            _logger.LogDebug($"[UserManagement] Fetching users from {url}");
-            
+            var url = $"/users/list?take={take}&skip={skip}";
+
+            _logger.LogDebug("[UserManagement] Fetching users from {Url}", url);
+
             var response = await client.GetAsync(url);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 _logger.LogWarning("[UserManagement] Access denied to user list - requires admin role");
-                throw new UnauthorizedAccessException("Access denied. You do not have permission to view users. Admin role required.");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to view users.");
             }
 
             response.EnsureSuccessStatusCode();
 
             var users = await response.Content.ReadFromJsonAsync<List<UserDto>>() ?? new();
-            
-            _logger.LogInformation($"[UserManagement] Loaded {users.Count} users");
-            
+
+            _logger.LogInformation("[UserManagement] Loaded {Count} users", users.Count);
+
             return users;
         }
         catch (UnauthorizedAccessException)
@@ -89,54 +89,68 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    /// <summary>
-    /// Update a user's role via AuthServer
-    /// Phase 2: Direct AuthServer call (no audit logging)
-    /// </summary>
-    public async Task<UpdateUserRoleResponse> UpdateUserRoleAsync(string username, string newRole)
+    public async Task<UserActionResult> CreateUserAsync(CreateUserRequest request)
     {
         try
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation($"[UserManagement] Updating role for {username} to {newRole}");
+            _logger.LogInformation("[UserManagement] Creating user {Email}", request.Email);
 
-            var request = new UpdateUserRoleRequest { Role = newRole };
-            
-            var response = await client.PutAsJsonAsync($"/api/admin/users/{username}/role", request);
+            var response = await client.PostAsJsonAsync("/users", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                _logger.LogWarning("[UserManagement] Access denied to role update - requires admin role");
-                throw new UnauthorizedAccessException("Access denied. You do not have permission to update user roles. Admin role required.");
+                _logger.LogWarning("[UserManagement] Access denied to create user - requires admin role");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to create users.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError($"[UserManagement] Role update failed: {response.StatusCode} - {errorContent}");
-                return new UpdateUserRoleResponse
-                {
-                    Success = false,
-                    Message = $"Failed to update role: {response.StatusCode}"
-                };
+                var message = await ReadErrorMessageAsync(response);
+                _logger.LogError("[UserManagement] Create user failed: {Status} - {Message}", response.StatusCode, message);
+                return new UserActionResult { Success = false, Message = message };
             }
 
-            var result = await response.Content.ReadFromJsonAsync<UpdateUserRoleResponse>();
-            
-            if (result == null)
+            return new UserActionResult { Success = true };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[UserManagement] Failed to create user");
+            throw;
+        }
+    }
+
+    public async Task<UserActionResult> UpdateUserRolesAsync(string id, List<string> roles)
+    {
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+
+            _logger.LogInformation("[UserManagement] Updating roles for user {UserId}", id);
+
+            var request = new UpdateUserRolesRequest { Roles = roles };
+
+            var response = await client.PutAsJsonAsync($"/users/{id}/roles", request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                return new UpdateUserRoleResponse
-                {
-                    Success = true,
-                    NewRole = newRole,
-                    Message = "Role updated successfully"
-                };
+                _logger.LogWarning("[UserManagement] Access denied to update roles - requires admin role");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to update roles.");
             }
 
-            _logger.LogInformation($"[UserManagement] Role updated successfully for {username}");
-            
-            return result;
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await ReadErrorMessageAsync(response);
+                _logger.LogError("[UserManagement] Role update failed: {Status} - {Message}", response.StatusCode, message);
+                return new UserActionResult { Success = false, Message = message };
+            }
+
+            return new UserActionResult { Success = true };
         }
         catch (UnauthorizedAccessException)
         {
@@ -144,8 +158,64 @@ public class UserManagementService : IUserManagementService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"[UserManagement] Failed to update role for {username}");
+            _logger.LogError(ex, "[UserManagement] Failed to update roles for {UserId}", id);
             throw;
         }
+    }
+
+    public async Task<UserActionResult> SetUserDisabledAsync(string id, bool isDisabled)
+    {
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+
+            _logger.LogInformation("[UserManagement] Setting disabled={IsDisabled} for user {UserId}", isDisabled, id);
+
+            var request = new UpdateUserDisabledRequest { IsDisabled = isDisabled };
+            var response = await client.PutAsJsonAsync($"/users/{id}/disable", request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("[UserManagement] Disable endpoint not available");
+                return new UserActionResult
+                {
+                    Success = false,
+                    EndpointNotFound = true,
+                    Message = "Disable endpoint is not available."
+                };
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[UserManagement] Access denied to disable user - requires admin role");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to disable users.");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await ReadErrorMessageAsync(response);
+                _logger.LogError("[UserManagement] Disable toggle failed: {Status} - {Message}", response.StatusCode, message);
+                return new UserActionResult { Success = false, Message = message };
+            }
+
+            return new UserActionResult { Success = true };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[UserManagement] Failed to update disable status for {UserId}", id);
+            throw;
+        }
+    }
+
+    private static async Task<string> ReadErrorMessageAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(content)
+            ? $"Request failed with status {response.StatusCode}."
+            : content;
     }
 }

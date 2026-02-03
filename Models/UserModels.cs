@@ -1,33 +1,38 @@
 namespace Bellwood.AdminPortal.Models;
 
 /// <summary>
-/// User information from AuthServer GET /api/admin/users
+/// User information from AdminApi GET /users/list
 /// </summary>
 public class UserDto
 {
-    public string Username { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
+    public string Id { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public string Role { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
+    public List<string> Roles { get; set; } = new();
     public DateTime CreatedAt { get; set; }
-    public DateTime? LastLogin { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+    public bool IsDisabled { get; set; }
 }
 
-/// <summary>
-/// Request to update user's role
-/// </summary>
-public class UpdateUserRoleRequest
+public class CreateUserRequest
 {
-    public string Role { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public List<string> Roles { get; set; } = new();
+    public string TemporaryPassword { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Response from role update
-/// </summary>
-public class UpdateUserRoleResponse
+public class UpdateUserRolesRequest
+{
+    public List<string> Roles { get; set; } = new();
+}
+
+public class UpdateUserDisabledRequest
+{
+    public bool IsDisabled { get; set; }
+}
+
+public class UserActionResult
 {
     public bool Success { get; set; }
     public string? Message { get; set; }
-    public string? NewRole { get; set; }
+    public bool EndpointNotFound { get; set; }
 }
