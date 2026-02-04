@@ -120,6 +120,14 @@
                                                         }
                                                     </button>
                                                 }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary" 
+                                                          title="User disable feature coming in next release"
+                                                          style="cursor: help; padding: 0.375rem 0.75rem;">
+                                                        🚧 Disable: Not Yet Available
+                                                    </span>
+                                                }
                                             </td>
                                         </tr>
                                     }
@@ -262,7 +270,7 @@
     private string? errorMessage;
     private bool showCreateModal = false;
     private bool showRolesModal = false;
-    private bool disableEndpointAvailable = true;
+    private bool disableEndpointAvailable = false; // Start as unavailable for alpha testing
 
     private readonly List<string> availableRoles = new() { "Passenger", "Driver", "Dispatcher", "Admin" };
     private HashSet<string> selectedRoles = new(StringComparer.OrdinalIgnoreCase);
