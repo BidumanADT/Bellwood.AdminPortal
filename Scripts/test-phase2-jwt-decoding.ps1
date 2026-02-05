@@ -7,6 +7,9 @@ param(
     [string]$AdminPortalUrl = "https://localhost:7257"
 )
 
+# Import test helpers
+Import-Module "$PSScriptRoot\Test-Helpers.psm1" -Force
+
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host "Phase 2.1: JWT Decoding & Role Extraction Tests" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
@@ -16,46 +19,8 @@ $testsPassed = 0
 $testsFailed = 0
 $testResults = @()
 
-# Helper function to ignore SSL certificate errors (for dev environment)
-add-type @"
-    using System.Net;
-    using System.Security.Cryptography.X509Certificates;
-    public class TrustAllCertsPolicy : ICertificatePolicy {
-        public bool CheckValidationResult(
-            ServicePoint srvPoint, X509Certificate certificate,
-            WebRequest request, int certificateProblem) {
-            return true;
-        }
-    }
-"@
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# Helper function to parse JWT
-function Parse-JWT {
-    param([string]$Token)
-    
-    try {
-        $parts = $Token.Split('.')
-        if ($parts.Length -ne 3) {
-            return $null
-        }
-        
-        $payload = $parts[1]
-        # Add padding if needed
-        while ($payload.Length % 4 -ne 0) {
-            $payload += "="
-        }
-        
-        $bytes = [System.Convert]::FromBase64String($payload)
-        $json = [System.Text.Encoding]::UTF8.GetString($bytes)
-        return $json | ConvertFrom-Json
-    }
-    catch {
-        Write-Host "Error parsing JWT: $_" -ForegroundColor Red
-        return $null
-    }
-}
+# Initialize SSL trust
+Initialize-SSLTrust
 
 # Test 1: Login as Admin (alice) and verify JWT contains role claim
 Write-Host "Test 1: Login as admin (alice) and verify JWT role claim" -ForegroundColor Yellow
@@ -65,11 +30,10 @@ try {
         password = "password"
     } | ConvertTo-Json
     
-    $response = Invoke-RestMethod -Uri "$AuthServerUrl/api/auth/login" `
+    $response = Invoke-SafeRestMethod -Uri "$AuthServerUrl/api/auth/login" `
         -Method Post `
-        -ContentType "application/json" `
         -Body $loginBody `
-        -ErrorAction Stop
+        -ContentType "application/json"
     
     if ($response.accessToken) {
         $claims = Parse-JWT -Token $response.accessToken
@@ -153,11 +117,10 @@ try {
         password = "password"
     } | ConvertTo-Json
     
-    $response = Invoke-RestMethod -Uri "$AuthServerUrl/api/auth/login" `
+    $response = Invoke-SafeRestMethod -Uri "$AuthServerUrl/api/auth/login" `
         -Method Post `
-        -ContentType "application/json" `
         -Body $loginBody `
-        -ErrorAction Stop
+        -ContentType "application/json"
     
     if ($response.accessToken) {
         $claims = Parse-JWT -Token $response.accessToken
@@ -201,11 +164,10 @@ try {
         password = "password"
     } | ConvertTo-Json
     
-    $response = Invoke-RestMethod -Uri "$AuthServerUrl/api/auth/login" `
+    $response = Invoke-SafeRestMethod -Uri "$AuthServerUrl/api/auth/login" `
         -Method Post `
-        -ContentType "application/json" `
         -Body $loginBody `
-        -ErrorAction Stop
+        -ContentType "application/json"
     
     if ($response.refreshToken) {
         Write-Host "  ? PASS: Refresh token returned" -ForegroundColor Green

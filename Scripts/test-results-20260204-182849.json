@@ -1,0 +1,44 @@
+﻿[
+    {
+        "Test":  "API Connectivity \u0026 Health",
+        "Category":  "Phase 1: Core",
+        "Result":  "FAILED",
+        "Duration":  "0.2s",
+        "Error":  "Exit code 1"
+    },
+    {
+        "Test":  "JWT Decoding \u0026 Role Extraction",
+        "Category":  "Phase 2: Auth",
+        "Result":  "PASSED",
+        "Duration":  "0.2s",
+        "Error":  null
+    },
+    {
+        "Test":  "Token Refresh Mechanism",
+        "Category":  "Phase 2: Auth",
+        "Result":  "FAILED",
+        "Duration":  "3.9s",
+        "Error":  "Exit code 1"
+    },
+    {
+        "Test":  "User Management \u0026 Role Assignment",
+        "Category":  "Phase 2: User Management",
+        "Result":  "PASSED",
+        "Duration":  "2.5s",
+        "Error":  null
+    },
+    {
+        "Test":  "403 Forbidden Error Handling",
+        "Category":  "Phase 2: Error Handling",
+        "Result":  "PASSED",
+        "Duration":  "4.7s",
+        "Error":  null
+    },
+    {
+        "Test":  "Quote Lifecycle (Pending ? Acknowledged ? Responded)",
+        "Category":  "Phase B: Quotes",
+        "Result":  "PASSED",
+        "Duration":  "1.0s",
+        "Error":  null
+    }
+]

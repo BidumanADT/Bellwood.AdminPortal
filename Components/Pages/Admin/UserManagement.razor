@@ -70,11 +70,12 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Email</th>
-                                        <th>Roles</th>
-                                        <th>Created At</th>
-                                        <th>Modified At</th>
-                                        <th>Actions</th>
+                                        <th class="text-white">Username</th>
+                                        <th class="text-white">Email</th>
+                                        <th class="text-white">Roles</th>
+                                        <th class="text-white">Created At</th>
+                                        <th class="text-white">Modified At</th>
+                                        <th class="text-white">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -82,23 +83,35 @@
                                     {
                                         <tr>
                                             <td>
+                                                <strong class="text-white">
+                                                    @if (!string.IsNullOrEmpty(user.Username))
+                                                    {
+                                                        @user.Username
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted fst-italic">No username</span>
+                                                    }
+                                                </strong>
+                                            </td>
+                                            <td class="text-light">
                                                 @if (!string.IsNullOrEmpty(user.Email))
                                                 {
                                                     @user.Email
                                                 }
                                                 else
                                                 {
-                                                    <span class="text-muted">No email</span>
+                                                    <span class="text-muted fst-italic">No email</span>
                                                 }
                                             </td>
                                             <td>
-                                                <span>@FormatRoles(user)</span>
+                                                <span class="text-white">@FormatRoles(user)</span>
                                             </td>
                                             <td>
-                                                <small>@user.CreatedAt.ToLocalTime().ToString("g")</small>
+                                                <small class="text-light">@user.CreatedAt.ToLocalTime().ToString("g")</small>
                                             </td>
                                             <td>
-                                                <small>@(user.ModifiedAt.HasValue ? user.ModifiedAt.Value.ToLocalTime().ToString("g") : "—")</small>
+                                                <small class="text-light">@(user.ModifiedAt.HasValue ? user.ModifiedAt.Value.ToLocalTime().ToString("g") : "—")</small>
                                             </td>
                                             <td class="d-flex flex-wrap gap-2">
                                                 <button class="btn btn-sm btn-outline-primary"
@@ -145,16 +158,16 @@
                     <div class="modal-dialog modal-dialog-centered modal-lg">
                         <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
                             <div class="modal-header">
-                                <h5 class="modal-title">Create User</h5>
-                                <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
+                                <h5 class="modal-title text-white">Create User</h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CloseCreateModal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Email</label>
+                                    <label class="form-label text-white">Email</label>
                                     <input type="email" class="form-control" @bind="newUserEmail" />
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Roles</label>
+                                    <label class="form-label text-white">Roles</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         @foreach (var role in availableRoles)
                                         {
@@ -163,17 +176,17 @@
                                                        type="checkbox"
                                                        checked="@selectedCreateRoles.Contains(role)"
                                                        @onchange="(args) => ToggleCreateRole(role, args.Value)" />
-                                                <label class="form-check-label">@role</label>
+                                                <label class="form-check-label text-light">@role</label>
                                             </div>
                                         }
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Temporary Password</label>
+                                    <label class="form-label text-white">Temporary Password</label>
                                     <input type="password" class="form-control" @bind="temporaryPassword" />
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Confirm Password</label>
+                                    <label class="form-label text-white">Confirm Password</label>
                                     <input type="password" class="form-control" @bind="confirmPassword" />
                                     <small class="text-muted">Minimum 10 characters.</small>
                                 </div>
@@ -200,16 +213,22 @@
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
                             <div class="modal-header">
-                                <h5 class="modal-title">Edit User Roles</h5>
-                                <button type="button" class="btn-close" @onclick="CancelRoleChange"></button>
+                                <h5 class="modal-title text-white">Edit User Roles</h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CancelRoleChange"></button>
                             </div>
                             <div class="modal-body">
-                                <p>
-                                    <strong>User:</strong> @selectedUser.Email<br />
-                                    <strong>Current Roles:</strong> @FormatRoles(selectedUser)
+                                <p class="text-light">
+                                    <strong class="text-white">User:</strong> <span class="text-bellwood-gold">@selectedUser.Username</span>
+                                    @if (!string.IsNullOrEmpty(selectedUser.Email))
+                                    {
+                                        <br />
+                                        <strong class="text-white">Email:</strong> <span class="text-light">@selectedUser.Email</span>
+                                    }
+                                    <br />
+                                    <strong class="text-white">Current Roles:</strong> <span class="text-light">@FormatRoles(selectedUser)</span>
                                 </p>
                                 <div class="mb-3">
-                                    <label class="form-label">Roles</label>
+                                    <label class="form-label text-white">Roles</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         @foreach (var role in availableRoles)
                                         {
@@ -218,7 +237,7 @@
                                                        type="checkbox"
                                                        checked="@selectedRoles.Contains(role)"
                                                        @onchange="(args) => ToggleEditRole(role, args.Value)" />
-                                                <label class="form-check-label">@role</label>
+                                                <label class="form-check-label text-light">@role</label>
                                             </div>
                                         }
                                     </div>
@@ -352,7 +371,10 @@
 
             if (result.Success)
             {
-                successMessage = $"Roles updated for {selectedUser.Email}.";
+                var userIdentifier = !string.IsNullOrEmpty(selectedUser.Username) 
+                    ? selectedUser.Username 
+                    : selectedUser.Email;
+                successMessage = $"Roles updated for {userIdentifier}.";
                 toast?.ShowSuccess(successMessage);
 
                 await LoadUsersAsync();
@@ -474,7 +496,11 @@
             if (result.Success)
             {
                 user.IsDisabled = !user.IsDisabled;
-                successMessage = $"{user.Email} {(user.IsDisabled ? "disabled" : "enabled")}.";
+                var userIdentifier = !string.IsNullOrEmpty(user.Username)
+                    ? user.Username
+                    : user.Email;
+                successMessage = $"{userIdentifier} {(user.IsDisabled ? "disabled" : "enabled")}.";
+
                 toast?.ShowSuccess(successMessage);
             }
             else

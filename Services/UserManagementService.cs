@@ -16,30 +16,22 @@ public class UserManagementService : IUserManagementService
 {
     private readonly IHttpClientFactory _httpFactory;
     private readonly IAuthTokenProvider _tokenProvider;
-    private readonly IAdminApiKeyProvider _apiKeyProvider;
     private readonly ILogger<UserManagementService> _logger;
 
     public UserManagementService(
         IHttpClientFactory httpFactory,
         IAuthTokenProvider tokenProvider,
-        IAdminApiKeyProvider apiKeyProvider,
         ILogger<UserManagementService> logger)
     {
         _httpFactory = httpFactory;
         _tokenProvider = tokenProvider;
-        _apiKeyProvider = apiKeyProvider;
         _logger = logger;
     }
 
     private async Task<HttpClient> GetAuthorizedClientAsync()
     {
-        var client = _httpFactory.CreateClient("AdminAPI");
-
-        var apiKey = _apiKeyProvider.GetApiKey();
-        if (!string.IsNullOrWhiteSpace(apiKey))
-        {
-            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Admin-ApiKey", apiKey);
-        }
+        // FIXED: User management endpoints are on AuthServer, not AdminAPI
+        var client = _httpFactory.CreateClient("AuthServer");
 
         // Attach JWT token
         var token = await _tokenProvider.GetTokenAsync();
@@ -58,7 +50,8 @@ public class UserManagementService : IUserManagementService
         {
             var client = await GetAuthorizedClientAsync();
 
-            var url = $"/users/list?take={take}&skip={skip}";
+            // AuthServer endpoint: /api/admin/users
+            var url = $"/api/admin/users?take={take}&skip={skip}";
 
             _logger.LogDebug("[UserManagement] Fetching users from {Url}", url);
 
@@ -97,7 +90,7 @@ public class UserManagementService : IUserManagementService
 
             _logger.LogInformation("[UserManagement] Creating user {Email}", request.Email);
 
-            var response = await client.PostAsJsonAsync("/users", request);
+            var response = await client.PostAsJsonAsync("/api/admin/users", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -135,7 +128,7 @@ public class UserManagementService : IUserManagementService
 
             var request = new UpdateUserRolesRequest { Roles = roles };
 
-            var response = await client.PutAsJsonAsync($"/users/{id}/roles", request);
+            var response = await client.PutAsJsonAsync($"/api/admin/users/{id}/roles", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -172,7 +165,7 @@ public class UserManagementService : IUserManagementService
             _logger.LogInformation("[UserManagement] Setting disabled={IsDisabled} for user {UserId}", isDisabled, id);
 
             var request = new UpdateUserDisabledRequest { IsDisabled = isDisabled };
-            var response = await client.PutAsJsonAsync($"/users/{id}/disable", request);
+            var response = await client.PutAsJsonAsync($"/api/admin/users/{id}/disable", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
