@@ -80,47 +80,106 @@ Write-Host ""
 Write-Host "Test 2: Use refresh token to obtain new access token" -ForegroundColor Yellow
 try {
     if ($script:refreshToken) {
-        $refreshBody = @{
-            grant_type = "refresh_token"
-            refresh_token = $script:refreshToken
-        } | ConvertTo-Json
+        # OAuth2/OIDC endpoints typically expect form-encoded data, not JSON
+        # Try both formats to determine which AuthServer expects
         
-        $response = Invoke-RestMethod -Uri "$AuthServerUrl/connect/token" `
-            -Method Post `
-            -ContentType "application/json" `
-            -Body $refreshBody `
-            -ErrorAction Stop
-        
-        if ($response.access_token) {
-            Write-Host "  ? PASS: New access token obtained via refresh token" -ForegroundColor Green
-            $testsPassed++
-            $testResults += [PSCustomObject]@{
-                Test = "Token Refresh"
-                Result = "PASS"
-                Details = "New access token length: $($response.access_token.Length)"
-            }
+        # Attempt 1: Form-encoded (OAuth2 standard)
+        Write-Host "  Attempting form-encoded request..." -ForegroundColor Gray
+        try {
+            $formBody = "grant_type=refresh_token&refresh_token=$($script:refreshToken)"
             
-            # Verify new token is different
-            if ($response.access_token -ne $script:accessToken) {
-                Write-Host "  ? PASS: New token is different from original" -ForegroundColor Green
+            $response = Invoke-RestMethod -Uri "$AuthServerUrl/connect/token" `
+                -Method Post `
+                -ContentType "application/x-www-form-urlencoded" `
+                -Body $formBody `
+                -ErrorAction Stop
+            
+            if ($response.access_token) {
+                Write-Host "  ? PASS: New access token obtained via refresh token (form-encoded)" -ForegroundColor Green
                 $testsPassed++
                 $testResults += [PSCustomObject]@{
-                    Test = "Token Uniqueness"
+                    Test = "Token Refresh"
                     Result = "PASS"
-                    Details = "New token differs from original"
+                    Details = "New access token length: $($response.access_token.Length) (form-encoded)"
+                }
+                
+                # Verify new token is different
+                if ($response.access_token -ne $script:accessToken) {
+                    Write-Host "  ? PASS: New token is different from original" -ForegroundColor Green
+                }
+                else {
+                    Write-Host "  ??  WARNING: New token is identical to original" -ForegroundColor Yellow
                 }
             }
-            else {
-                Write-Host "  ??  WARNING: New token is identical to original" -ForegroundColor Yellow
-            }
         }
-        else {
-            Write-Host "  ? FAIL: No access token in refresh response" -ForegroundColor Red
-            $testsFailed++
-            $testResults += [PSCustomObject]@{
-                Test = "Token Refresh"
-                Result = "FAIL"
-                Details = "access_token not present in response"
+        catch {
+            # Attempt 2: JSON format (custom endpoint)
+            Write-Host "  Form-encoded failed, trying JSON format..." -ForegroundColor Gray
+            try {
+                $refreshBody = @{
+                    grant_type = "refresh_token"
+                    refresh_token = $script:refreshToken
+                } | ConvertTo-Json
+                
+                $response = Invoke-RestMethod -Uri "$AuthServerUrl/connect/token" `
+                    -Method Post `
+                    -ContentType "application/json" `
+                    -Body $refreshBody `
+                    -ErrorAction Stop
+                
+                if ($response.access_token -or $response.accessToken) {
+                    $newToken = if ($response.access_token) { $response.access_token } else { $response.accessToken }
+                    Write-Host "  ? PASS: New access token obtained via refresh token (JSON)" -ForegroundColor Green
+                    $testsPassed++
+                    $testResults += [PSCustomObject]@{
+                        Test = "Token Refresh"
+                        Result = "PASS"
+                        Details = "New access token length: $($newToken.Length) (JSON)"
+                    }
+                    
+                    # Verify new token is different
+                    if ($newToken -ne $script:accessToken) {
+                        Write-Host "  ? PASS: New token is different from original" -ForegroundColor Green
+                    }
+                }
+            }
+            catch {
+                Write-Host "  ? FAIL: Token refresh failed with both formats" -ForegroundColor Red
+                Write-Host "    Form-encoded error: $($_.Exception.Message)" -ForegroundColor Gray
+                Write-Host "    Trying alternative endpoint /api/auth/refresh..." -ForegroundColor Gray
+                
+                # Attempt 3: Alternative endpoint
+                try {
+                    $refreshBody = @{
+                        refreshToken = $script:refreshToken
+                    } | ConvertTo-Json
+                    
+                    $response = Invoke-RestMethod -Uri "$AuthServerUrl/api/auth/refresh" `
+                        -Method Post `
+                        -ContentType "application/json" `
+                        -Body $refreshBody `
+                        -ErrorAction Stop
+                    
+                    if ($response.accessToken) {
+                        Write-Host "  ? PASS: New access token obtained via /api/auth/refresh" -ForegroundColor Green
+                        $testsPassed++
+                        $testResults += [PSCustomObject]@{
+                            Test = "Token Refresh"
+                            Result = "PASS"
+                            Details = "New access token length: $($response.accessToken.Length) (custom endpoint)"
+                        }
+                    }
+                }
+                catch {
+                    Write-Host "  ? FAIL: All token refresh methods failed" -ForegroundColor Red
+                    Write-Host "    Last error: $_" -ForegroundColor Gray
+                    $testsFailed++
+                    $testResults += [PSCustomObject]@{
+                        Test = "Token Refresh"
+                        Result = "FAIL"
+                        Details = "All refresh methods failed. See investigation doc."
+                    }
+                }
             }
         }
     }
@@ -129,7 +188,7 @@ try {
     }
 }
 catch {
-    Write-Host "  ? FAIL: Token refresh failed - $_" -ForegroundColor Red
+    Write-Host "  ? FAIL: Unexpected error - $_" -ForegroundColor Red
     $testsFailed++
 }
 

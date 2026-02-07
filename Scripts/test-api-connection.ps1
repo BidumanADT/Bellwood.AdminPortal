@@ -113,3 +113,6 @@ Write-Host "1. Ensure AuthServer is running on https://localhost:5001" -Foregrou
 Write-Host "2. Run the AdminPortal: dotnet run" -ForegroundColor White
 Write-Host "3. Navigate to https://localhost:7257" -ForegroundColor White
 Write-Host "4. Login with alice/password or bob/password" -ForegroundColor White
+
+# Exit with success code
+exit 0

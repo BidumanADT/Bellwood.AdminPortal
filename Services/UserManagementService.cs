@@ -8,7 +8,7 @@ public interface IUserManagementService
 {
     Task<List<UserDto>> GetUsersAsync(int take = 50, int skip = 0);
     Task<UserActionResult> CreateUserAsync(CreateUserRequest request);
-    Task<UserActionResult> UpdateUserRolesAsync(string id, List<string> roles);
+    Task<UserActionResult> UpdateUserRoleAsync(string username, string role); // Changed: single role, username parameter
     Task<UserActionResult> SetUserDisabledAsync(string id, bool isDisabled);
 }
 
@@ -118,31 +118,35 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    public async Task<UserActionResult> UpdateUserRolesAsync(string id, List<string> roles)
+    public async Task<UserActionResult> UpdateUserRoleAsync(string username, string role)
     {
         try
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation("[UserManagement] Updating roles for user {UserId}", id);
+            _logger.LogInformation("[UserManagement] Updating role for user {Username} to {Role}", username, role);
 
-            var request = new UpdateUserRolesRequest { Roles = roles };
+            // AuthServer expects: PUT /api/admin/users/{username}/role
+            // Request body: { "role": "admin" }
+            var request = new { role = role };
 
-            var response = await client.PutAsJsonAsync($"/api/admin/users/{id}/roles", request);
+            var response = await client.PutAsJsonAsync($"/api/admin/users/{username}/role", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                _logger.LogWarning("[UserManagement] Access denied to update roles - requires admin role");
+                _logger.LogWarning("[UserManagement] Access denied to update role - requires admin role");
                 throw new UnauthorizedAccessException("Access denied. Admin role required to update roles.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 var message = await ReadErrorMessageAsync(response);
-                _logger.LogError("[UserManagement] Role update failed: {Status} - {Message}", response.StatusCode, message);
+                _logger.LogError("[UserManagement] Role update failed for {Username}: {Status} - {Message}", 
+                    username, response.StatusCode, message);
                 return new UserActionResult { Success = false, Message = message };
             }
 
+            _logger.LogInformation("[UserManagement] Successfully updated role for {Username} to {Role}", username, role);
             return new UserActionResult { Success = true };
         }
         catch (UnauthorizedAccessException)
@@ -151,7 +155,7 @@ public class UserManagementService : IUserManagementService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[UserManagement] Failed to update roles for {UserId}", id);
+            _logger.LogError(ex, "[UserManagement] Failed to update role for {Username}", username);
             throw;
         }
     }
