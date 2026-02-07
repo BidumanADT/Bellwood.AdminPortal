@@ -110,7 +110,7 @@ public class TokenRefreshService : ITokenRefreshService, IDisposable
         
         try
         {
-            _logger.LogInformation("[TokenRefresh] Attempting to refresh access token");
+            _logger.LogInformation("[TokenRefresh] ========== TOKEN REFRESH START ==========");
             
             var refreshToken = await _tokenProvider.GetRefreshTokenAsync();
             if (string.IsNullOrEmpty(refreshToken))
@@ -119,52 +119,102 @@ public class TokenRefreshService : ITokenRefreshService, IDisposable
                 return false;
             }
             
+            _logger.LogInformation("[TokenRefresh] Refresh token length: {Length}", refreshToken.Length);
+            
             var client = _httpFactory.CreateClient("AuthServer");
             
-            // Call token refresh endpoint
-            var response = await client.PostAsJsonAsync("/connect/token", new
+            // OAuth2/OIDC standard uses form-encoded data, not JSON
+            // Try form-encoded first (most likely to work)
+            _logger.LogInformation("[TokenRefresh] Attempting form-encoded request (OAuth2 standard)");
+            
+            var formContent = new FormUrlEncodedContent(new[]
             {
-                grant_type = "refresh_token",
-                refresh_token = refreshToken
+                new KeyValuePair<string, string>("grant_type", "refresh_token"),
+                new KeyValuePair<string, string>("refresh_token", refreshToken)
             });
+            
+            _logger.LogInformation("[TokenRefresh] Request endpoint: POST /connect/token");
+            _logger.LogInformation("[TokenRefresh] Content-Type: application/x-www-form-urlencoded");
+            
+            var response = await client.PostAsync("/connect/token", formContent);
+            
+            _logger.LogInformation("[TokenRefresh] Response status: {StatusCode} ({Reason})", 
+                response.StatusCode, response.ReasonPhrase);
+            
+            // Read response body for debugging
+            var responseBody = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("[TokenRefresh] Response body: {Body}", responseBody);
             
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError($"[TokenRefresh] Token refresh failed: {response.StatusCode}");
-                return false;
+                _logger.LogWarning("[TokenRefresh] Form-encoded request failed, trying JSON format");
+                
+                // Fallback to JSON format (in case AuthServer uses custom implementation)
+                var requestBody = new
+                {
+                    grant_type = "refresh_token",
+                    refresh_token = refreshToken
+                };
+                
+                var requestJson = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                _logger.LogInformation("[TokenRefresh] Fallback - Request body (JSON): {Body}", requestJson);
+                
+                response = await client.PostAsJsonAsync("/connect/token", requestBody);
+                
+                _logger.LogInformation("[TokenRefresh] Fallback response status: {StatusCode} ({Reason})", 
+                    response.StatusCode, response.ReasonPhrase);
+                
+                responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("[TokenRefresh] Fallback response body: {Body}", responseBody);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("[TokenRefresh] Token refresh failed with both formats: {StatusCode}", response.StatusCode);
+                    _logger.LogInformation("[TokenRefresh] ========== TOKEN REFRESH FAILED ==========");
+                    return false;
+                }
             }
             
             var result = await response.Content.ReadFromJsonAsync<TokenResponse>();
             
-            if (result?.AccessToken == null)
+            // Handle both snake_case (OAuth2) and camelCase (custom) property names
+            var accessToken = result?.AccessToken ?? result?.access_token;
+            var newRefreshToken = result?.RefreshToken ?? result?.refresh_token;
+            
+            if (string.IsNullOrEmpty(accessToken))
             {
                 _logger.LogError("[TokenRefresh] No access token in refresh response");
+                _logger.LogInformation("[TokenRefresh] ========== TOKEN REFRESH FAILED ==========");
                 return false;
             }
             
-            _logger.LogInformation("[TokenRefresh] Token refreshed successfully");
+            _logger.LogInformation("[TokenRefresh] Token refreshed successfully - New token length: {Length}", 
+                accessToken.Length);
             
             // Update stored tokens
-            await _tokenProvider.SetTokenAsync(result.AccessToken);
+            await _tokenProvider.SetTokenAsync(accessToken);
             
-            if (!string.IsNullOrEmpty(result.RefreshToken))
+            if (!string.IsNullOrEmpty(newRefreshToken))
             {
-                await _tokenProvider.SetRefreshTokenAsync(result.RefreshToken);
+                await _tokenProvider.SetRefreshTokenAsync(newRefreshToken);
+                _logger.LogInformation("[TokenRefresh] New refresh token received");
             }
             
             // Extract username from new token for auth state update
             var handler = new JwtSecurityTokenHandler();
-            var jsonToken = handler.ReadJwtToken(result.AccessToken);
+            var jsonToken = handler.ReadJwtToken(accessToken);
             var username = jsonToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown";
             
             // Update authentication state with new token
-            await _authStateProvider.MarkUserAsAuthenticatedAsync(username, result.AccessToken);
+            await _authStateProvider.MarkUserAsAuthenticatedAsync(username, accessToken);
             
+            _logger.LogInformation("[TokenRefresh] ========== TOKEN REFRESH SUCCESS ==========");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[TokenRefresh] Error during token refresh");
+            _logger.LogError(ex, "[TokenRefresh] ========== TOKEN REFRESH EXCEPTION ==========");
+            _logger.LogError("[TokenRefresh] Exception message: {Message}", ex.Message);
             return false;
         }
         finally
@@ -180,8 +230,12 @@ public class TokenRefreshService : ITokenRefreshService, IDisposable
     
     private class TokenResponse
     {
+        // Support both camelCase (custom) and snake_case (OAuth2 standard)
         public string? AccessToken { get; set; }
+        public string? access_token { get; set; }
         public string? RefreshToken { get; set; }
+        public string? refresh_token { get; set; }
         public int ExpiresIn { get; set; }
+        public int expires_in { get; set; }
     }
 }

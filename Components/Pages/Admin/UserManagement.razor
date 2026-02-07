@@ -10,23 +10,27 @@
 
 <PageTitle>User Management - Bellwood Elite</PageTitle>
 
-<!-- Phase 3: Toast Notifications -->
 <ToastNotification @ref="toast" />
 
 <AuthorizeView Roles="admin">
     <Authorized>
         <div class="container-fluid py-4">
             <div class="row mb-4">
-                <div class="col">
-                    <h2 class="text-bellwood-gold">?? User Management</h2>
-                    <p class="text-muted">Manage user accounts and role assignments</p>
+                <div class="col-md-8">
+                    <h2 class="text-bellwood-gold">👥 User Management</h2>
+                    <p class="text-muted">Create users and manage role assignments</p>
+                </div>
+                <div class="col-md-4 d-flex justify-content-md-end align-items-start">
+                    <button class="btn btn-primary" @onclick="ShowCreateModal">
+                        ➕ Create User
+                    </button>
                 </div>
             </div>
 
             @if (!string.IsNullOrEmpty(successMessage))
             {
                 <div class="alert alert-success alert-dismissible fade show">
-                    ? @successMessage
+                    ✅ @successMessage
                     <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
                 </div>
             }
@@ -34,33 +38,10 @@
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="alert alert-danger alert-dismissible fade show">
-                    ? @errorMessage
+                    ⚠️ @errorMessage
                     <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
                 </div>
             }
-
-            <!-- Filters -->
-            <div class="row mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">Filter by Role:</label>
-                    <select class="form-select" @bind="roleFilter" @bind:after="LoadUsersAsync">
-                        <option value="">All Roles</option>
-                        <option value="admin">Admins</option>
-                        <option value="dispatcher">Dispatchers</option>
-                        <option value="booker">Bookers</option>
-                        <option value="driver">Drivers</option>
-                    </select>
-                </div>
-                <div class="col-md-8 d-flex align-items-end">
-                    <button class="btn btn-primary" @onclick="LoadUsersAsync" disabled="@isLoading">
-                        @if (isLoading)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                        }
-                        ?? Refresh
-                    </button>
-                </div>
-            </div>
 
             <!-- Users Table -->
             @if (isLoading)
@@ -84,21 +65,17 @@
                     <div class="card-body">
                         <h5 class="card-title">
                             Users (@users.Count)
-                            @if (!string.IsNullOrEmpty(roleFilter))
-                            {
-                                <span class="text-muted">- @roleFilter only</span>
-                            }
                         </h5>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Username</th>
-                                        <th>Email</th>
-                                        <th>Current Role</th>
-                                        <th>Status</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
+                                        <th class="text-white">Username</th>
+                                        <th class="text-white">Email</th>
+                                        <th class="text-white">Roles</th>
+                                        <th class="text-white">Created At</th>
+                                        <th class="text-white">Modified At</th>
+                                        <th class="text-white">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -106,51 +83,64 @@
                                     {
                                         <tr>
                                             <td>
-                                                <strong>@user.Username</strong>
-                                                <br />
-                                                <small class="text-muted">@user.UserId</small>
+                                                <strong class="text-white">
+                                                    @if (!string.IsNullOrEmpty(user.Username))
+                                                    {
+                                                        @user.Username
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted fst-italic">No username</span>
+                                                    }
+                                                </strong>
                                             </td>
-                                            <td>
+                                            <td class="text-light">
                                                 @if (!string.IsNullOrEmpty(user.Email))
                                                 {
                                                     @user.Email
                                                 }
                                                 else
                                                 {
-                                                    <span class="text-muted">No email</span>
+                                                    <span class="text-muted fst-italic">No email</span>
                                                 }
                                             </td>
                                             <td>
-                                                @{
-                                                    var badgeClass = user.Role.ToLower() switch
-                                                    {
-                                                        "admin" => "badge bg-danger",
-                                                        "dispatcher" => "badge bg-primary",
-                                                        "booker" => "badge bg-info",
-                                                        "driver" => "badge bg-success",
-                                                        _ => "badge bg-secondary"
-                                                    };
-                                                }
-                                                <span class="@badgeClass">@user.Role</span>
+                                                <span class="text-white">@FormatRole(user)</span>
                                             </td>
                                             <td>
-                                                @if (user.IsActive)
+                                                <small class="text-light">@user.CreatedAt.ToLocalTime().ToString("g")</small>
+                                            </td>
+                                            <td>
+                                                <small class="text-light">@(user.ModifiedAt.HasValue ? user.ModifiedAt.Value.ToLocalTime().ToString("g") : "—")</small>
+                                            </td>
+                                            <td class="d-flex flex-wrap gap-2">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => ShowRoleChangeModal(user)">
+                                                    Edit Roles
+                                                </button>
+                                                @if (disableEndpointAvailable)
                                                 {
-                                                    <span class="badge bg-success">Active</span>
+                                                    <button class="btn btn-sm @(user.IsDisabled ? "btn-outline-success" : "btn-outline-danger")"
+                                                            @onclick="() => ToggleUserDisabled(user)"
+                                                            disabled="@(statusUpdatingUserId == user.Id)">
+                                                        @if (statusUpdatingUserId == user.Id)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@(user.IsDisabled ? "Enable" : "Disable")</span>
+                                                        }
+                                                    </button>
                                                 }
                                                 else
                                                 {
-                                                    <span class="badge bg-danger">Inactive</span>
+                                                    <span class="badge bg-secondary" 
+                                                          title="User disable feature coming in next release"
+                                                          style="cursor: help; padding: 0.375rem 0.75rem;">
+                                                        🚧 Disable: Not Yet Available
+                                                    </span>
                                                 }
-                                            </td>
-                                            <td>
-                                                <small>@user.CreatedAt.ToLocalTime().ToString("MM/dd/yyyy")</small>
-                                            </td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-primary" 
-                                                        @onclick="() => ShowRoleChangeModal(user)">
-                                                    Change Role
-                                                </button>
                                             </td>
                                         </tr>
                                     }
@@ -161,38 +151,105 @@
                 </div>
             }
 
+            <!-- Create User Modal -->
+            @if (showCreateModal)
+            {
+                <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
+                            <div class="modal-header">
+                                <h5 class="modal-title text-white">Create User</h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CloseCreateModal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label text-white">Email</label>
+                                    <input type="email" class="form-control" @bind="newUserEmail" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-white">Roles</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        @foreach (var role in availableRoles)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       checked="@selectedCreateRoles.Contains(role)"
+                                                       @onchange="(args) => ToggleCreateRole(role, args.Value)" />
+                                                <label class="form-check-label text-light">@role</label>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-white">Temporary Password</label>
+                                    <input type="password" class="form-control" @bind="temporaryPassword" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-white">Confirm Password</label>
+                                    <input type="password" class="form-control" @bind="confirmPassword" />
+                                    <small class="text-muted">Minimum 10 characters.</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CloseCreateModal">Cancel</button>
+                                <button type="button" class="btn btn-primary" @onclick="CreateUserAsync" disabled="@isCreating">
+                                    @if (isCreating)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    Create User
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
             <!-- Role Change Modal -->
-            @if (selectedUser != null)
+            @if (showRolesModal && selectedUser != null)
             {
                 <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
                             <div class="modal-header">
-                                <h5 class="modal-title">Change User Role</h5>
-                                <button type="button" class="btn-close" @onclick="CancelRoleChange"></button>
+                                <h5 class="modal-title text-white">Edit User Roles</h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CancelRoleChange"></button>
                             </div>
                             <div class="modal-body">
-                                <p>
-                                    <strong>User:</strong> @selectedUser.Username<br />
-                                    <strong>Current Role:</strong> <span class="badge bg-secondary">@selectedUser.Role</span>
+                                <p class="text-light">
+                                    <strong class="text-white">User:</strong> <span class="text-bellwood-gold">@selectedUser.Username</span>
+                                    @if (!string.IsNullOrEmpty(selectedUser.Email))
+                                    {
+                                        <br />
+                                        <strong class="text-white">Email:</strong> <span class="text-light">@selectedUser.Email</span>
+                                    }
+                                    <br />
+                                    <strong class="text-white">Current Roles:</strong> <span class="text-light">@FormatRoles(selectedUser)</span>
                                 </p>
-                                
                                 <div class="mb-3">
-                                    <label class="form-label">New Role:</label>
-                                    <select class="form-select" @bind="newRole">
-                                        <option value="admin">Admin - Full system access</option>
-                                        <option value="dispatcher">Dispatcher - Operational access only</option>
-                                        <option value="booker">Booker - Create bookings/quotes</option>
-                                        <option value="driver">Driver - View assigned rides</option>
-                                    </select>
+                                    <label class="form-label text-white">Role</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        @foreach (var role in availableRoles)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="radio"
+                                                       name="userRole"
+                                                       id="role-@role"
+                                                       checked="@selectedRoles.Contains(role)"
+                                                       @onchange="() => SelectSingleRole(role)" />
+                                                <label class="form-check-label text-light" for="role-@role">@role</label>
+                                            </div>
+                                        }
+                                    </div>
+                                    <small class="text-muted">Users can only have one role.</small>
                                 </div>
-                                
                                 <div class="alert alert-warning">
-                                    <strong>?? Important:</strong>
+                                    <strong>ℹ️ Note:</strong>
                                     <ul class="mb-0">
-                                        <li>Role changes take effect on the user's next login</li>
-                                        <li>The user will need to refresh their token or re-login</li>
-                                        <li>Roles are mutually exclusive (one role per user)</li>
+                                        <li>Role changes take effect on the user's next login.</li>
+                                        <li>At least one role must remain assigned.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -200,14 +257,14 @@
                                 <button type="button" class="btn btn-secondary" @onclick="CancelRoleChange">
                                     Cancel
                                 </button>
-                                <button type="button" class="btn btn-primary" 
-                                        @onclick="ConfirmRoleChange" 
-                                        disabled="@(isUpdating || newRole == selectedUser.Role)">
-                                    @if (isUpdating)
+                                <button type="button" class="btn btn-primary"
+                                        @onclick="ConfirmRoleChange"
+                                        disabled="@isUpdatingRoles">
+                                    @if (isUpdatingRoles)
                                     {
                                         <span class="spinner-border spinner-border-sm me-2"></span>
                                     }
-                                    Update Role
+                                    Save Roles
                                 </button>
                             </div>
                         </div>
@@ -226,15 +283,25 @@
 @code {
     private List<UserDto> users = new();
     private UserDto? selectedUser;
-    private string roleFilter = "";
-    private string newRole = "";
     
     private bool isLoading = false;
-    private bool isUpdating = false;
+    private bool isUpdatingRoles = false;
+    private bool isCreating = false;
+    private string? statusUpdatingUserId;
     private string? successMessage;
     private string? errorMessage;
+    private bool showCreateModal = false;
+    private bool showRolesModal = false;
+    private bool disableEndpointAvailable = false; // Start as unavailable for alpha testing
 
-    // Phase 3: Toast notification reference
+    private readonly List<string> availableRoles = new() { "passenger", "driver", "dispatcher", "admin" };
+    private HashSet<string> selectedRoles = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedCreateRoles = new(StringComparer.OrdinalIgnoreCase);
+
+    private string newUserEmail = string.Empty;
+    private string temporaryPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+
     private ToastNotification? toast;
 
     protected override async Task OnInitializedAsync()
@@ -249,9 +316,7 @@
         
         try
         {
-            Console.WriteLine($"[UserManagement] Loading users with role filter: {roleFilter}");
-            users = await UserService.GetAllUsersAsync(string.IsNullOrEmpty(roleFilter) ? null : roleFilter);
-            Console.WriteLine($"[UserManagement] Loaded {users.Count} users");
+            users = await UserService.GetUsersAsync();
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -263,7 +328,7 @@
         {
             errorMessage = $"Failed to load users: {ex.Message}";
             toast?.ShowError(errorMessage);
-            Console.WriteLine($"[UserManagement] Error: {ex.Message}");
+            Console.WriteLine($"[UserManagement] Error loading users: {ex.Message}");
         }
         finally
         {
@@ -274,45 +339,55 @@
     private void ShowRoleChangeModal(UserDto user)
     {
         selectedUser = user;
-        newRole = user.Role;
+        selectedRoles = new HashSet<string>(
+            (user.Roles ?? new List<string>()).Select(NormalizeRoleSelection),
+            StringComparer.OrdinalIgnoreCase);
         successMessage = null;
         errorMessage = null;
+        showRolesModal = true;
     }
 
     private void CancelRoleChange()
     {
         selectedUser = null;
-        newRole = "";
+        selectedRoles.Clear();
+        showRolesModal = false;
     }
 
     private async Task ConfirmRoleChange()
     {
         if (selectedUser == null) return;
+        
+        if (!selectedRoles.Any())
+        {
+            errorMessage = "Select at least one role before saving.";
+            toast?.ShowError(errorMessage);
+            return;
+        }
 
-        isUpdating = true;
+        // AuthServer uses mutually exclusive roles - user can only have ONE role
+        if (selectedRoles.Count > 1)
+        {
+            errorMessage = "Users can only have one role. Please select only one.";
+            toast?.ShowError(errorMessage);
+            return;
+        }
+
+        isUpdatingRoles = true;
         errorMessage = null;
         successMessage = null;
 
         try
         {
-            Console.WriteLine($"[UserManagement] Updating {selectedUser.Username} role to {newRole}");
-            
+            var newRole = selectedRoles.First();
             var result = await UserService.UpdateUserRoleAsync(selectedUser.Username, newRole);
 
             if (result.Success)
             {
-                successMessage = $"Role updated for {selectedUser.Username}. Change will take effect on next login.";
+                successMessage = $"Role updated for {selectedUser.Username} to {newRole}.";
                 toast?.ShowSuccess(successMessage);
-                
-                // Update local user list
-                var userToUpdate = users.FirstOrDefault(u => u.Username == selectedUser.Username);
-                if (userToUpdate != null)
-                {
-                    userToUpdate.Role = newRole;
-                }
-                
-                // Auto-close modal after success
-                await Task.Delay(500); // Brief delay to show success
+
+                await LoadUsersAsync();
                 CancelRoleChange();
             }
             else
@@ -330,10 +405,244 @@
         {
             errorMessage = $"Failed to update role: {ex.Message}";
             toast?.ShowError(errorMessage);
+            Console.WriteLine($"[UserManagement] Error updating role: {ex.Message}");
         }
         finally
         {
-            isUpdating = false;
+            isUpdatingRoles = false;
         }
+    }
+
+    private void ShowCreateModal()
+    {
+        showCreateModal = true;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateModal = false;
+        ClearCreateForm();
+    }
+
+    private async Task CreateUserAsync()
+    {
+        var validationError = ValidateCreateForm();
+        if (!string.IsNullOrEmpty(validationError))
+        {
+            errorMessage = validationError;
+            toast?.ShowError(validationError);
+            return;
+        }
+
+        isCreating = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var request = new CreateUserRequest
+            {
+                Email = newUserEmail.Trim(),
+                Roles = selectedCreateRoles.ToList(),
+                TemporaryPassword = temporaryPassword
+            };
+
+            var result = await UserService.CreateUserAsync(request);
+
+            if (result.Success)
+            {
+                successMessage = $"User {request.Email} created successfully.";
+                toast?.ShowSuccess(successMessage);
+                CloseCreateModal();
+                await LoadUsersAsync();
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to create user.";
+                toast?.ShowError(errorMessage);
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create user: {ex.Message}";
+            toast?.ShowError(errorMessage);
+        }
+        finally
+        {
+            temporaryPassword = string.Empty;
+            confirmPassword = string.Empty;
+            isCreating = false;
+        }
+    }
+
+    private async Task ToggleUserDisabled(UserDto user)
+    {
+        if (statusUpdatingUserId != null)
+        {
+            return;
+        }
+
+        statusUpdatingUserId = user.Id;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await UserService.SetUserDisabledAsync(user.Id, !user.IsDisabled);
+            if (result.EndpointNotFound)
+            {
+                disableEndpointAvailable = false;
+                errorMessage = result.Message ?? "Disable endpoint not available.";
+                toast?.ShowError(errorMessage);
+                return;
+            }
+
+            if (result.Success)
+            {
+                user.IsDisabled = !user.IsDisabled;
+                var userIdentifier = !string.IsNullOrEmpty(user.Username)
+                    ? user.Username
+                    : user.Email;
+                successMessage = $"{userIdentifier} {(user.IsDisabled ? "disabled" : "enabled")}.";
+
+                toast?.ShowSuccess(successMessage);
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Failed to update user status.";
+                toast?.ShowError(errorMessage);
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+            toast?.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to update user status: {ex.Message}";
+            toast?.ShowError(errorMessage);
+        }
+        finally
+        {
+            statusUpdatingUserId = null;
+        }
+    }
+
+    private void ToggleCreateRole(string role, object? value)
+    {
+        ToggleRoleSelection(selectedCreateRoles, role, value);
+    }
+
+    private void ToggleEditRole(string role, object? value)
+    {
+        ToggleRoleSelection(selectedRoles, role, value);
+    }
+
+    private void SelectSingleRole(string role)
+    {
+        selectedRoles.Clear();
+        selectedRoles.Add(role);
+    }
+
+    private static void ToggleRoleSelection(HashSet<string> selection, string role, object? value)
+    {
+        if (value is not bool isChecked)
+        {
+            return;
+        }
+
+        if (isChecked)
+        {
+            selection.Add(role);
+        }
+        else
+        {
+            selection.Remove(role);
+        }
+    }
+
+    private string? ValidateCreateForm()
+    {
+        if (string.IsNullOrWhiteSpace(newUserEmail))
+        {
+            return "Email is required.";
+        }
+
+        if (!selectedCreateRoles.Any())
+        {
+            return "Select at least one role.";
+        }
+
+        if (string.IsNullOrWhiteSpace(temporaryPassword) || temporaryPassword.Length < 10)
+        {
+            return "Temporary password must be at least 10 characters.";
+        }
+
+        if (!string.Equals(temporaryPassword, confirmPassword, StringComparison.Ordinal))
+        {
+            return "Temporary password and confirmation do not match.";
+        }
+
+        return null;
+    }
+
+    private void ClearCreateForm()
+    {
+        newUserEmail = string.Empty;
+        temporaryPassword = string.Empty;
+        confirmPassword = string.Empty;
+        selectedCreateRoles.Clear();
+    }
+
+    private string NormalizeRoleSelection(string role)
+    {
+        var normalized = availableRoles.FirstOrDefault(r => r.Equals(role, StringComparison.OrdinalIgnoreCase));
+        return normalized ?? role;
+    }
+
+    private static string GetRoleLabel(string role)
+    {
+        return role.ToLowerInvariant() switch
+        {
+            "admin" => "Admin",
+            "dispatcher" => "Dispatcher",
+            "driver" => "Driver",
+            "passenger" => "Passenger",
+            _ => role
+        };
+    }
+
+    private static string FormatRole(UserDto user)
+    {
+        if (string.IsNullOrEmpty(user.Role))
+        {
+            return "None";
+        }
+
+        return GetRoleLabel(user.Role);
+    }
+
+    private static string FormatRoles(UserDto user)
+    {
+        // Backward compatibility - use Role if available, fall back to Roles list
+        if (!string.IsNullOrEmpty(user.Role))
+        {
+            return GetRoleLabel(user.Role);
+        }
+        
+        if (user.Roles == null || user.Roles.Count == 0)
+        {
+            return "None";
+        }
+
+        return string.Join(", ", user.Roles.Select(GetRoleLabel));
     }
 }
