@@ -308,7 +308,12 @@
     private bool showRolesModal = false;
     private bool disableEndpointAvailable = false; // Start as unavailable for alpha testing
 
+    // Available roles - AdminAPI accepts case-insensitive, normalizes to lowercase
+    // Valid: "admin", "dispatcher", "driver", "booker"
     private readonly List<string> availableRoles = new() { "booker", "driver", "dispatcher", "admin" };
+    
+    private bool IsAdmin => selectedRoles.Contains("admin");
+
     private HashSet<string> selectedRoles = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedCreateRoles = new(StringComparer.OrdinalIgnoreCase);
 
@@ -396,6 +401,7 @@
             var newRole = selectedRoles.First();
             
             // Use userId (not username) for role updates via AdminAPI
+            // AdminAPI accepts lowercase role names (booker, driver, dispatcher, admin)
             var result = await UserService.UpdateUserRoleAsync(selectedUser.Id, newRole);
 
             if (result.Success)
@@ -404,7 +410,7 @@
                     ? selectedUser.Username 
                     : selectedUser.Email;
                     
-                successMessage = $"Role updated for {userIdentifier} to {newRole}.";
+                successMessage = $"Role updated for {userIdentifier} to {GetRoleLabel(newRole)}.";
                 toast?.ShowSuccess(successMessage);
 
                 await LoadUsersAsync();
@@ -462,10 +468,11 @@
 
         try
         {
+            // AdminAPI expects roles as an array: ["booker"] not "booker"
             var request = new CreateUserRequest
             {
                 Email = newUserEmail.Trim(),
-                Roles = selectedCreateRoles.ToList(),
+                Roles = selectedCreateRoles.ToList(),  // ← Already a List<string>
                 TemporaryPassword = temporaryPassword
             };
 

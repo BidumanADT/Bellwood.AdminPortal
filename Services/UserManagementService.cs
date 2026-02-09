@@ -113,7 +113,16 @@ public class UserManagementService : IUserManagementService
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation("[UserManagement] Creating user {Email}", request.Email);
+            _logger.LogInformation("[UserManagement] Creating user {Email} with roles: {Roles}", 
+                request.Email, 
+                string.Join(", ", request.Roles));
+
+            // Log the exact request being sent
+            var json = System.Text.Json.JsonSerializer.Serialize(request, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            _logger.LogDebug("[UserManagement] Request JSON:\n{Json}", json);
 
             // AdminAPI endpoint: POST /users
             var response = await client.PostAsJsonAsync("/users", request);
@@ -131,6 +140,7 @@ public class UserManagementService : IUserManagementService
                 return new UserActionResult { Success = false, Message = message };
             }
 
+            _logger.LogInformation("[UserManagement] Successfully created user {Email}", request.Email);
             return new UserActionResult { Success = true };
         }
         catch (UnauthorizedAccessException)
