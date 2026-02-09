@@ -8,30 +8,40 @@ public interface IUserManagementService
 {
     Task<List<UserDto>> GetUsersAsync(int take = 50, int skip = 0);
     Task<UserActionResult> CreateUserAsync(CreateUserRequest request);
-    Task<UserActionResult> UpdateUserRoleAsync(string username, string role); // Changed: single role, username parameter
-    Task<UserActionResult> SetUserDisabledAsync(string id, bool isDisabled);
+    Task<UserActionResult> UpdateUserRoleAsync(string userId, string role);
+    Task<UserActionResult> SetUserDisabledAsync(string userId, bool isDisabled);
 }
 
 public class UserManagementService : IUserManagementService
 {
     private readonly IHttpClientFactory _httpFactory;
     private readonly IAuthTokenProvider _tokenProvider;
+    private readonly IAdminApiKeyProvider _apiKeyProvider;
     private readonly ILogger<UserManagementService> _logger;
 
     public UserManagementService(
         IHttpClientFactory httpFactory,
         IAuthTokenProvider tokenProvider,
+        IAdminApiKeyProvider apiKeyProvider,
         ILogger<UserManagementService> logger)
     {
         _httpFactory = httpFactory;
         _tokenProvider = tokenProvider;
+        _apiKeyProvider = apiKeyProvider;
         _logger = logger;
     }
 
     private async Task<HttpClient> GetAuthorizedClientAsync()
     {
-        // FIXED: User management endpoints are on AuthServer, not AdminAPI
-        var client = _httpFactory.CreateClient("AuthServer");
+        // FIXED: User management endpoints are on AdminAPI, not AuthServer
+        var client = _httpFactory.CreateClient("AdminAPI");
+
+        // Add API key
+        var apiKey = _apiKeyProvider.GetApiKey();
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Admin-ApiKey", apiKey);
+        }
 
         // Attach JWT token
         var token = await _tokenProvider.GetTokenAsync();
@@ -50,8 +60,8 @@ public class UserManagementService : IUserManagementService
         {
             var client = await GetAuthorizedClientAsync();
 
-            // AuthServer endpoint: /api/admin/users
-            var url = $"/api/admin/users?take={take}&skip={skip}";
+            // AdminAPI endpoint: GET /users/list
+            var url = $"/users/list?take={take}&skip={skip}";
 
             _logger.LogDebug("[UserManagement] Fetching users from {Url}", url);
 
@@ -65,7 +75,17 @@ public class UserManagementService : IUserManagementService
 
             response.EnsureSuccessStatusCode();
 
-            var users = await response.Content.ReadFromJsonAsync<List<UserDto>>() ?? new();
+            // AdminAPI returns direct array (no wrapper) matching AuthServer format
+            var users = await response.Content.ReadFromJsonAsync<List<UserDto>>(new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (users == null)
+            {
+                _logger.LogWarning("[UserManagement] No users returned from API");
+                return new List<UserDto>();
+            }
 
             _logger.LogInformation("[UserManagement] Loaded {Count} users", users.Count);
 
@@ -74,6 +94,11 @@ public class UserManagementService : IUserManagementService
         catch (UnauthorizedAccessException)
         {
             throw; // Re-throw authorization exceptions
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogError(ex, "[UserManagement] JSON deserialization failed - Check if AdminAPI response format matches UserDto");
+            throw;
         }
         catch (Exception ex)
         {
@@ -88,9 +113,19 @@ public class UserManagementService : IUserManagementService
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation("[UserManagement] Creating user {Email}", request.Email);
+            _logger.LogInformation("[UserManagement] Creating user {Email} with roles: {Roles}", 
+                request.Email, 
+                string.Join(", ", request.Roles));
 
-            var response = await client.PostAsJsonAsync("/api/admin/users", request);
+            // Log the exact request being sent
+            var json = System.Text.Json.JsonSerializer.Serialize(request, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            _logger.LogDebug("[UserManagement] Request JSON:\n{Json}", json);
+
+            // AdminAPI endpoint: POST /users
+            var response = await client.PostAsJsonAsync("/users", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -105,6 +140,7 @@ public class UserManagementService : IUserManagementService
                 return new UserActionResult { Success = false, Message = message };
             }
 
+            _logger.LogInformation("[UserManagement] Successfully created user {Email}", request.Email);
             return new UserActionResult { Success = true };
         }
         catch (UnauthorizedAccessException)
@@ -118,19 +154,19 @@ public class UserManagementService : IUserManagementService
         }
     }
 
-    public async Task<UserActionResult> UpdateUserRoleAsync(string username, string role)
+    public async Task<UserActionResult> UpdateUserRoleAsync(string userId, string role)
     {
         try
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation("[UserManagement] Updating role for user {Username} to {Role}", username, role);
+            _logger.LogInformation("[UserManagement] Updating role for user {UserId} to {Role}", userId, role);
 
-            // AuthServer expects: PUT /api/admin/users/{username}/role
+            // AdminAPI endpoint: PUT /users/{userId}/roles
             // Request body: { "role": "admin" }
             var request = new { role = role };
 
-            var response = await client.PutAsJsonAsync($"/api/admin/users/{username}/role", request);
+            var response = await client.PutAsJsonAsync($"/users/{userId}/roles", request);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
@@ -141,12 +177,12 @@ public class UserManagementService : IUserManagementService
             if (!response.IsSuccessStatusCode)
             {
                 var message = await ReadErrorMessageAsync(response);
-                _logger.LogError("[UserManagement] Role update failed for {Username}: {Status} - {Message}", 
-                    username, response.StatusCode, message);
+                _logger.LogError("[UserManagement] Role update failed for {UserId}: {Status} - {Message}", 
+                    userId, response.StatusCode, message);
                 return new UserActionResult { Success = false, Message = message };
             }
 
-            _logger.LogInformation("[UserManagement] Successfully updated role for {Username} to {Role}", username, role);
+            _logger.LogInformation("[UserManagement] Successfully updated role for {UserId} to {Role}", userId, role);
             return new UserActionResult { Success = true };
         }
         catch (UnauthorizedAccessException)
@@ -155,43 +191,44 @@ public class UserManagementService : IUserManagementService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[UserManagement] Failed to update role for {Username}", username);
+            _logger.LogError(ex, "[UserManagement] Failed to update role for {UserId}", userId);
             throw;
         }
     }
 
-    public async Task<UserActionResult> SetUserDisabledAsync(string id, bool isDisabled)
+    public async Task<UserActionResult> SetUserDisabledAsync(string userId, bool isDisabled)
     {
         try
         {
             var client = await GetAuthorizedClientAsync();
 
-            _logger.LogInformation("[UserManagement] Setting disabled={IsDisabled} for user {UserId}", isDisabled, id);
+            _logger.LogInformation("[UserManagement] Setting disabled={IsDisabled} for user {UserId}", isDisabled, userId);
 
-            var request = new UpdateUserDisabledRequest { IsDisabled = isDisabled };
-            var response = await client.PutAsJsonAsync($"/api/admin/users/{id}/disable", request);
+            // AdminAPI endpoint: PUT /users/{userId}/disable or /users/{userId}/enable
+            var endpoint = isDisabled ? $"/users/{userId}/disable" : $"/users/{userId}/enable";
+            var response = await client.PutAsync(endpoint, null);
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("[UserManagement] Disable endpoint not available");
+                _logger.LogWarning("[UserManagement] Disable/enable endpoint not available");
                 return new UserActionResult
                 {
                     Success = false,
                     EndpointNotFound = true,
-                    Message = "Disable endpoint is not available."
+                    Message = "User disable/enable feature is not yet available."
                 };
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                _logger.LogWarning("[UserManagement] Access denied to disable user - requires admin role");
-                throw new UnauthorizedAccessException("Access denied. Admin role required to disable users.");
+                _logger.LogWarning("[UserManagement] Access denied to disable/enable user - requires admin role");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to manage user status.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 var message = await ReadErrorMessageAsync(response);
-                _logger.LogError("[UserManagement] Disable toggle failed: {Status} - {Message}", response.StatusCode, message);
+                _logger.LogError("[UserManagement] Disable/enable toggle failed: {Status} - {Message}", response.StatusCode, message);
                 return new UserActionResult { Success = false, Message = message };
             }
 
@@ -203,7 +240,7 @@ public class UserManagementService : IUserManagementService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[UserManagement] Failed to update disable status for {UserId}", id);
+            _logger.LogError(ex, "[UserManagement] Failed to update disable status for {UserId}", userId);
             throw;
         }
     }

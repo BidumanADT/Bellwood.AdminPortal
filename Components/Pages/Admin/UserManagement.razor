@@ -88,9 +88,13 @@
                                                     {
                                                         @user.Username
                                                     }
+                                                    else if (!string.IsNullOrEmpty(user.Email))
+                                                    {
+                                                        @user.Email
+                                                    }
                                                     else
                                                     {
-                                                        <span class="text-muted fst-italic">No username</span>
+                                                        <span class="text-muted fst-italic">User @user.Id.Substring(0, 8)</span>
                                                     }
                                                 </strong>
                                             </td>
@@ -108,10 +112,10 @@
                                                 <span class="text-white">@FormatRole(user)</span>
                                             </td>
                                             <td>
-                                                <small class="text-light">@user.CreatedAt.ToLocalTime().ToString("g")</small>
+                                                <small class="text-light">@FormatDateTime(user.CreatedAtUtc)</small>
                                             </td>
                                             <td>
-                                                <small class="text-light">@(user.ModifiedAt.HasValue ? user.ModifiedAt.Value.ToLocalTime().ToString("g") : "—")</small>
+                                                <small class="text-light">@FormatDateTime(user.ModifiedAtUtc)</small>
                                             </td>
                                             <td class="d-flex flex-wrap gap-2">
                                                 <button class="btn btn-sm btn-outline-primary"
@@ -176,7 +180,7 @@
                                                        type="checkbox"
                                                        checked="@selectedCreateRoles.Contains(role)"
                                                        @onchange="(args) => ToggleCreateRole(role, args.Value)" />
-                                                <label class="form-check-label text-light">@role</label>
+                                                <label class="form-check-label text-light">@GetRoleLabel(role)</label>
                                             </div>
                                         }
                                     </div>
@@ -218,8 +222,18 @@
                             </div>
                             <div class="modal-body">
                                 <p class="text-light">
-                                    <strong class="text-white">User:</strong> <span class="text-bellwood-gold">@selectedUser.Username</span>
-                                    @if (!string.IsNullOrEmpty(selectedUser.Email))
+                                    <strong class="text-white">User:</strong> 
+                                    <span class="text-bellwood-gold">
+                                        @if (!string.IsNullOrEmpty(selectedUser.Username))
+                                        {
+                                            @selectedUser.Username
+                                        }
+                                        else
+                                        {
+                                            @selectedUser.Email
+                                        }
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(selectedUser.Email) && !string.IsNullOrEmpty(selectedUser.Username))
                                     {
                                         <br />
                                         <strong class="text-white">Email:</strong> <span class="text-light">@selectedUser.Email</span>
@@ -239,7 +253,7 @@
                                                        id="role-@role"
                                                        checked="@selectedRoles.Contains(role)"
                                                        @onchange="() => SelectSingleRole(role)" />
-                                                <label class="form-check-label text-light" for="role-@role">@role</label>
+                                                <label class="form-check-label text-light" for="role-@role">@GetRoleLabel(role)</label>
                                             </div>
                                         }
                                     </div>
@@ -294,7 +308,12 @@
     private bool showRolesModal = false;
     private bool disableEndpointAvailable = false; // Start as unavailable for alpha testing
 
-    private readonly List<string> availableRoles = new() { "passenger", "driver", "dispatcher", "admin" };
+    // Available roles - AdminAPI accepts case-insensitive, normalizes to lowercase
+    // Valid: "admin", "dispatcher", "driver", "booker"
+    private readonly List<string> availableRoles = new() { "booker", "driver", "dispatcher", "admin" };
+    
+    private bool IsAdmin => selectedRoles.Contains("admin");
+
     private HashSet<string> selectedRoles = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedCreateRoles = new(StringComparer.OrdinalIgnoreCase);
 
@@ -380,11 +399,18 @@
         try
         {
             var newRole = selectedRoles.First();
-            var result = await UserService.UpdateUserRoleAsync(selectedUser.Username, newRole);
+            
+            // Use userId (not username) for role updates via AdminAPI
+            // AdminAPI accepts lowercase role names (booker, driver, dispatcher, admin)
+            var result = await UserService.UpdateUserRoleAsync(selectedUser.Id, newRole);
 
             if (result.Success)
             {
-                successMessage = $"Role updated for {selectedUser.Username} to {newRole}.";
+                var userIdentifier = !string.IsNullOrEmpty(selectedUser.Username) 
+                    ? selectedUser.Username 
+                    : selectedUser.Email;
+                    
+                successMessage = $"Role updated for {userIdentifier} to {GetRoleLabel(newRole)}.";
                 toast?.ShowSuccess(successMessage);
 
                 await LoadUsersAsync();
@@ -442,10 +468,11 @@
 
         try
         {
+            // AdminAPI expects roles as an array: ["booker"] not "booker"
             var request = new CreateUserRequest
             {
                 Email = newUserEmail.Trim(),
-                Roles = selectedCreateRoles.ToList(),
+                Roles = selectedCreateRoles.ToList(),  // ← Already a List<string>
                 TemporaryPassword = temporaryPassword
             };
 
@@ -615,9 +642,21 @@
             "admin" => "Admin",
             "dispatcher" => "Dispatcher",
             "driver" => "Driver",
-            "passenger" => "Passenger",
+            "booker" => "Booker",
             _ => role
         };
+    }
+    
+    private static string FormatDateTime(DateTime? dateTime)
+    {
+        if (!dateTime.HasValue)
+            return "—";
+            
+        // Check if it's a placeholder/default value
+        if (dateTime.Value == DateTime.MinValue || dateTime.Value.Year == 1)
+            return "—";
+            
+        return dateTime.Value.ToLocalTime().ToString("g");
     }
 
     private static string FormatRole(UserDto user)
