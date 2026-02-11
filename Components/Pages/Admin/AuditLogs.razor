@@ -21,7 +21,7 @@
             <p class="text-muted">View and analyze system activity and user actions</p>
         </div>
         <div class="col-auto">
-            <button class="btn btn-outline-primary" @onclick="ExportToCsv" disabled="@isExporting">
+            <button class="btn btn-outline-primary me-2" @onclick="ExportToCsv" disabled="@isExporting">
                 @if (isExporting)
                 {
                     <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -33,8 +33,51 @@
                     <text>Export to CSV</text>
                 }
             </button>
+            <button class="btn btn-outline-danger" @onclick="ShowClearModal" disabled="@isLoading">
+                <span class="bi bi-trash3 me-2"></span>
+                Clear Audit Logs
+            </button>
         </div>
     </div>
+
+    <!-- Stats Card -->
+    @if (stats != null)
+    {
+        <div class="card mb-3 border-info">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-file-earmark-text text-info" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@stats.TotalCount.ToString("N0")</h5>
+                        <small class="text-muted">Total Log Entries</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-calendar-check text-success" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@(stats.OldestEntry?.ToLocalTime().ToString("MM/dd/yyyy") ?? "N/A")</h5>
+                        <small class="text-muted">Oldest Entry</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-calendar-event text-primary" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@(stats.NewestEntry?.ToLocalTime().ToString("MM/dd/yyyy") ?? "N/A")</h5>
+                        <small class="text-muted">Newest Entry</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-hdd text-warning" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@FormatFileSize(stats.StorageSizeBytes)</h5>
+                        <small class="text-muted">Storage Used</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     <!-- Filters -->
     <div class="card mb-3">
@@ -229,6 +272,81 @@
     }
 </div>
 
+<!-- Clear Confirmation Modal -->
+@if (showClearModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-danger">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <span class="bi bi-exclamation-triangle-fill me-2"></span>
+                        Clear Audit Logs
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelClear"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" role="alert">
+                        <strong>?? WARNING: This action is irreversible!</strong>
+                        <p class="mb-0">You are about to permanently delete <strong>ALL @(stats?.TotalCount.ToString("N0") ?? "audit log") entries</strong> from the system.</p>
+                    </div>
+                    
+                    <p class="mb-3">
+                        <strong>This will delete:</strong>
+                    </p>
+                    <ul class="mb-3">
+                        <li>All user activity logs</li>
+                        <li>All system event records</li>
+                        <li>All historical audit trail data</li>
+                    </ul>
+
+                    <p class="mb-3">
+                        <strong>Before proceeding:</strong>
+                    </p>
+                    <ul class="mb-3">
+                        <li>Ensure you have exported any logs needed for compliance</li>
+                        <li>Verify this action is authorized</li>
+                        <li>Consider the impact on audit trail requirements</li>
+                    </ul>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            To confirm, type <span class="badge bg-danger">CLEAR</span> below:
+                        </label>
+                        <input type="text" class="form-control @(confirmText == "CLEAR" ? "is-valid" : "")" 
+                               @bind="confirmText" 
+                               @bind:event="oninput"
+                               placeholder="Type CLEAR to confirm"
+                               autofocus />
+                        <div class="form-text">
+                            This confirmation is case-sensitive. Must be exactly: CLEAR
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelClear">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" 
+                            @onclick="ConfirmClear" 
+                            disabled="@(confirmText != "CLEAR" || isClearing)">
+                        @if (isClearing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <text>Clearing...</text>
+                        }
+                        else
+                        {
+                            <span class="bi bi-trash3 me-2"></span>
+                            <text>Delete All Audit Logs</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // Filter state
     private DateTime? startDate = DateTime.Today.AddDays(-30); // Default: last 30 days
@@ -240,8 +358,12 @@
     // UI state
     private bool isLoading = false;
     private bool isExporting = false;
+    private bool isClearing = false;
+    private bool showClearModal = false;
+    private string confirmText = "";
     private string? errorMessage;
     private AuditLogResponse? response;
+    private AuditLogStats? stats;
 
     // Phase 3: Toast notification reference
     private ToastNotification? toast;
@@ -253,7 +375,22 @@
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("[AuditLogs] Initializing audit log viewer");
+        await LoadStatsAsync();
         await LoadLogsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        try
+        {
+            stats = await AuditLogService.GetAuditLogStatsAsync();
+            Console.WriteLine($"[AuditLogs] Stats loaded - Total: {stats.TotalCount}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AuditLogs] Failed to load stats: {ex.Message}");
+            // Don't show error for stats - non-critical
+        }
     }
 
     private async Task ApplyFilters()
@@ -271,6 +408,7 @@
         selectedUser = "";
         currentPage = 1;
         await LoadLogsAsync();
+        await LoadStatsAsync();
     }
 
     private async Task LoadLogsAsync()
@@ -375,6 +513,68 @@
         }
     }
 
+    private void ShowClearModal()
+    {
+        confirmText = "";
+        showClearModal = true;
+    }
+
+    private void CancelClear()
+    {
+        confirmText = "";
+        showClearModal = false;
+    }
+
+    private async Task ConfirmClear()
+    {
+        if (confirmText != "CLEAR")
+        {
+            toast?.ShowError("Please type CLEAR to confirm deletion.");
+            return;
+        }
+
+        isClearing = true;
+
+        try
+        {
+            Console.WriteLine("[AuditLogs] Clearing all audit logs...");
+            var result = await AuditLogService.ClearAuditLogsAsync();
+
+            if (result.Success)
+            {
+                toast?.ShowSuccess($"Successfully deleted {result.DeletedCount:N0} audit log entries.");
+                Console.WriteLine($"[AuditLogs] Cleared {result.DeletedCount} logs");
+
+                // Refresh data
+                await LoadStatsAsync();
+                await LoadLogsAsync();
+                
+                // Close modal
+                showClearModal = false;
+                confirmText = "";
+            }
+            else
+            {
+                toast?.ShowError($"Failed to clear audit logs: {result.ErrorMessage}");
+                Console.WriteLine($"[AuditLogs] Clear failed: {result.ErrorMessage}");
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            toast?.ShowError(ex.Message);
+            Console.WriteLine($"[AuditLogs] Access denied: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            toast?.ShowError($"Error clearing audit logs: {ex.Message}");
+            Console.WriteLine($"[AuditLogs] Clear error: {ex.Message}");
+        }
+        finally
+        {
+            isClearing = false;
+        }
+    }
+
     private string GetActionColor(string action)
     {
         if (action.Contains("Created")) return "success";
@@ -395,5 +595,20 @@
             "Unauthorized" => "warning",
             _ => "secondary"
         };
+    }
+
+    private string FormatFileSize(long? bytes)
+    {
+        if (!bytes.HasValue || bytes.Value == 0)
+            return "N/A";
+
+        var kb = bytes.Value / 1024.0;
+        var mb = kb / 1024.0;
+
+        if (mb >= 1)
+            return $"{mb:F2} MB";
+        if (kb >= 1)
+            return $"{kb:F2} KB";
+        return $"{bytes.Value} bytes";
     }
 }

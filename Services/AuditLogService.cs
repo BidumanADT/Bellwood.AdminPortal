@@ -192,6 +192,111 @@ public class AuditLogService : IAuditLogService
     }
 
     /// <summary>
+    /// Gets statistics about audit logs (total count, date range, etc.).
+    /// Phase 3: Admin audit log management.
+    /// </summary>
+    public async Task<AuditLogStats> GetAuditLogStatsAsync()
+    {
+        _logger.LogInformation("[AuditLog] Fetching audit log statistics");
+
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+            var response = await client.GetAsync("/api/admin/audit/stats");
+
+            // Handle 403 Forbidden
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[AuditLog] Access denied to stats endpoint");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to view audit log statistics.");
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var stats = await response.Content.ReadFromJsonAsync<AuditLogStats>();
+
+            if (stats == null)
+            {
+                _logger.LogWarning("[AuditLog] Null stats response");
+                return new AuditLogStats { TotalCount = 0 };
+            }
+
+            _logger.LogInformation("[AuditLog] Stats retrieved - Total: {Total}, Range: {Oldest} to {Newest}",
+                stats.TotalCount, stats.OldestEntry, stats.NewestEntry);
+
+            return stats;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AuditLog] Failed to get statistics");
+            throw new Exception($"Failed to retrieve audit log statistics: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Clears all audit logs from the system.
+    /// DESTRUCTIVE ACTION - Requires admin role.
+    /// Phase 3: Admin audit log management.
+    /// </summary>
+    public async Task<AuditLogClearResult> ClearAuditLogsAsync()
+    {
+        _logger.LogWarning("[AuditLog] CLEARING ALL AUDIT LOGS - This action is irreversible!");
+
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+            var response = await client.PostAsync("/api/admin/audit/clear", null);
+
+            // Handle 403 Forbidden
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[AuditLog] Access denied to clear endpoint");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to clear audit logs.");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[AuditLog] Clear failed: {Status} - {Message}", response.StatusCode, errorMessage);
+                return new AuditLogClearResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Failed to clear audit logs: {errorMessage}"
+                };
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AuditLogClearResult>();
+
+            if (result == null)
+            {
+                _logger.LogWarning("[AuditLog] Null clear result");
+                return new AuditLogClearResult
+                {
+                    Success = false,
+                    ErrorMessage = "No response from server"
+                };
+            }
+
+            _logger.LogWarning("[AuditLog] Successfully cleared {Count} audit logs", result.DeletedCount);
+
+            return result;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AuditLog] Clear operation failed");
+            throw new Exception($"Failed to clear audit logs: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Escapes special characters for CSV format.
     /// </summary>
     private static string EscapeCsv(string value)
