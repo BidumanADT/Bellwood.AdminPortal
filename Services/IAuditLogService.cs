@@ -35,7 +35,8 @@ public interface IAuditLogService
     /// Clears all audit logs from the system.
     /// DESTRUCTIVE ACTION - Requires admin role and typed confirmation.
     /// </summary>
+    /// <param name="confirmationText">User's typed confirmation (must be exactly "CLEAR")</param>
     /// <returns>Result indicating success and number of logs deleted.</returns>
     /// <exception cref="UnauthorizedAccessException">Thrown when user lacks admin permissions (403 Forbidden).</exception>
-    Task<AuditLogClearResult> ClearAuditLogsAsync();
+    Task<AuditLogClearResult> ClearAuditLogsAsync(string confirmationText);
 }

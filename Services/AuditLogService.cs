@@ -202,7 +202,7 @@ public class AuditLogService : IAuditLogService
         try
         {
             var client = await GetAuthorizedClientAsync();
-            var response = await client.GetAsync("/api/admin/audit/stats");
+            var response = await client.GetAsync("/api/admin/audit-logs/stats");
 
             // Handle 403 Forbidden
             if (response.StatusCode == HttpStatusCode.Forbidden)
@@ -242,14 +242,17 @@ public class AuditLogService : IAuditLogService
     /// DESTRUCTIVE ACTION - Requires admin role.
     /// Phase 3: Admin audit log management.
     /// </summary>
-    public async Task<AuditLogClearResult> ClearAuditLogsAsync()
+    public async Task<AuditLogClearResult> ClearAuditLogsAsync(string confirmationText)
     {
         _logger.LogWarning("[AuditLog] CLEARING ALL AUDIT LOGS - This action is irreversible!");
 
         try
         {
             var client = await GetAuthorizedClientAsync();
-            var response = await client.PostAsync("/api/admin/audit/clear", null);
+            
+            // Send user's actual input to API for validation (defense-in-depth)
+            var requestBody = new { confirm = confirmationText };
+            var response = await client.PostAsJsonAsync("/api/admin/audit-logs/clear", requestBody);
 
             // Handle 403 Forbidden
             if (response.StatusCode == HttpStatusCode.Forbidden)
