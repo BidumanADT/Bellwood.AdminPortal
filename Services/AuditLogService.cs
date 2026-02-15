@@ -192,6 +192,115 @@ public class AuditLogService : IAuditLogService
     }
 
     /// <summary>
+    /// Gets statistics about audit logs (total count, date range, etc.).
+    /// Phase 3: Admin audit log management.
+    /// </summary>
+    public async Task<AuditLogStats> GetAuditLogStatsAsync()
+    {
+        _logger.LogInformation("[AuditLog] Fetching audit log statistics");
+
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+            var response = await client.GetAsync("/api/admin/audit-logs/stats");
+
+            // Handle 403 Forbidden
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[AuditLog] Access denied to stats endpoint");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to view audit log statistics.");
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var stats = await response.Content.ReadFromJsonAsync<AuditLogStats>();
+
+            if (stats == null)
+            {
+                _logger.LogWarning("[AuditLog] Null stats response");
+                return new AuditLogStats { TotalCount = 0 };
+            }
+
+            _logger.LogInformation("[AuditLog] Stats retrieved - Total: {Total}, Range: {Oldest} to {Newest}",
+                stats.TotalCount, stats.OldestEntry, stats.NewestEntry);
+
+            return stats;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AuditLog] Failed to get statistics");
+            throw new Exception($"Failed to retrieve audit log statistics: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Clears all audit logs from the system.
+    /// DESTRUCTIVE ACTION - Requires admin role.
+    /// Phase 3: Admin audit log management.
+    /// </summary>
+    public async Task<AuditLogClearResult> ClearAuditLogsAsync(string confirmationText)
+    {
+        _logger.LogWarning("[AuditLog] CLEARING ALL AUDIT LOGS - This action is irreversible!");
+
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+            
+            // Send user's actual input to API for validation (defense-in-depth)
+            var requestBody = new { confirm = confirmationText };
+            var response = await client.PostAsJsonAsync("/api/admin/audit-logs/clear", requestBody);
+
+            // Handle 403 Forbidden
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[AuditLog] Access denied to clear endpoint");
+                throw new UnauthorizedAccessException("Access denied. Admin role required to clear audit logs.");
+            }
+
+            // Handle all other non-success responses
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[AuditLog] Clear failed: {Status} - {Message}", response.StatusCode, errorMessage);
+                return new AuditLogClearResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Failed to clear audit logs: {errorMessage}"
+                };
+            }
+
+            // Deserialize response to get DeletedCount
+            var result = await response.Content.ReadFromJsonAsync<AuditLogClearResult>();
+
+            // HTTP 200 OK means success - trust the status code, not the response body fields
+            // AdminAPI may return different response format than we expect
+            var deletedCount = result?.DeletedCount ?? 0;
+            
+            _logger.LogWarning("[AuditLog] Successfully cleared {Count} audit logs", deletedCount);
+
+            return new AuditLogClearResult
+            {
+                Success = true,  // HTTP 200 = operation succeeded
+                DeletedCount = deletedCount,
+                ErrorMessage = null
+            };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AuditLog] Clear operation failed");
+            throw new Exception($"Failed to clear audit logs: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Escapes special characters for CSV format.
     /// </summary>
     private static string EscapeCsv(string value)

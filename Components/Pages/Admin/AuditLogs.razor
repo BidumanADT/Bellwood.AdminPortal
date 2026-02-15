@@ -1,4 +1,5 @@
 @page "/admin/audit-logs"
+@rendermode InteractiveServer
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "admin")]
 @using Bellwood.AdminPortal.Models
 @using Bellwood.AdminPortal.Services
@@ -21,7 +22,7 @@
             <p class="text-muted">View and analyze system activity and user actions</p>
         </div>
         <div class="col-auto">
-            <button class="btn btn-outline-primary" @onclick="ExportToCsv" disabled="@isExporting">
+            <button class="btn btn-outline-primary me-2" @onclick="ExportToCsv" disabled="@isExporting">
                 @if (isExporting)
                 {
                     <span class="spinner-border spinner-border-sm me-2" role="status"></span>
@@ -33,8 +34,53 @@
                     <text>Export to CSV</text>
                 }
             </button>
+            <button class="btn btn-outline-danger" 
+                    @onclick="@(() => { Console.WriteLine("[AuditLogs] === BUTTON ONCLICK FIRED ==="); ShowClearModal(); })" 
+                    disabled="@isLoading">
+                <span class="bi bi-trash3 me-2"></span>
+                Clear Audit Logs
+            </button>
         </div>
     </div>
+
+    <!-- Stats Card -->
+    @if (stats != null)
+    {
+        <div class="card mb-3 border-info">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-file-earmark-text text-info" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@stats.TotalCount.ToString("N0")</h5>
+                        <small class="text-muted">Total Log Entries</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-calendar-check text-success" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@(stats.OldestEntry?.ToLocalTime().ToString("MM/dd/yyyy") ?? "N/A")</h5>
+                        <small class="text-muted">Oldest Entry</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-calendar-event text-primary" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@(stats.NewestEntry?.ToLocalTime().ToString("MM/dd/yyyy") ?? "N/A")</h5>
+                        <small class="text-muted">Newest Entry</small>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-2">
+                            <span class="bi bi-hdd text-warning" style="font-size: 2rem;"></span>
+                        </div>
+                        <h5 class="mb-0">@FormatFileSize(stats.StorageSizeBytes)</h5>
+                        <small class="text-muted">Storage Used</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     <!-- Filters -->
     <div class="card mb-3">
@@ -229,6 +275,85 @@
     }
 </div>
 
+<!-- Clear Confirmation Modal -->
+@{
+    Console.WriteLine($"[AuditLogs] Rendering modal check - showClearModal: {showClearModal}");
+}
+@if (showClearModal)
+{
+    Console.WriteLine("[AuditLogs] === RENDERING MODAL MARKUP ===");
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-danger" style="background: var(--bellwood-charcoal); color: var(--bs-light);">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <span class="bi bi-exclamation-triangle-fill me-2"></span>
+                        Clear Audit Logs
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelClear"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" role="alert">
+                        <strong>?? WARNING: This action is irreversible!</strong>
+                        <p class="mb-0 text-dark">You are about to permanently delete <strong>ALL @GetLogCount() entries</strong> from the system.</p>
+                    </div>
+                    
+                    <p class="mb-3 text-white">
+                        <strong>This will delete:</strong>
+                    </p>
+                    <ul class="mb-3 text-white">
+                        <li>All user activity logs</li>
+                        <li>All system event records</li>
+                        <li>All historical audit trail data</li>
+                    </ul>
+
+                    <p class="mb-3 text-white">
+                        <strong>Before proceeding:</strong>
+                    </p>
+                    <ul class="mb-3 text-white">
+                        <li>Ensure you have exported any logs needed for compliance</li>
+                        <li>Verify this action is authorized</li>
+                        <li>Consider the impact on audit trail requirements</li>
+                    </ul>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white">
+                            To confirm, type <span class="badge bg-danger">CLEAR</span> below:
+                        </label>
+                        <input type="text" class="form-control @(confirmText == "CLEAR" ? "is-valid" : "")" 
+                               @bind="confirmText" 
+                               @bind:event="oninput"
+                               placeholder="Type CLEAR to confirm"
+                               autofocus />
+                        <div class="form-text text-light">
+                            This confirmation is case-sensitive. Must be exactly: CLEAR
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background: var(--bellwood-charcoal);">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelClear">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" 
+                            @onclick="ConfirmClear" 
+                            disabled="@(confirmText != "CLEAR" || isClearing)">
+                        @if (isClearing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <text>Clearing...</text>
+                        }
+                        else
+                        {
+                            <span class="bi bi-trash3 me-2"></span>
+                            <text>Delete All Audit Logs</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // Filter state
     private DateTime? startDate = DateTime.Today.AddDays(-30); // Default: last 30 days
@@ -240,8 +365,12 @@
     // UI state
     private bool isLoading = false;
     private bool isExporting = false;
+    private bool isClearing = false;
+    private bool showClearModal = false;
+    private string confirmText = "";
     private string? errorMessage;
     private AuditLogResponse? response;
+    private AuditLogStats? stats;
 
     // Phase 3: Toast notification reference
     private ToastNotification? toast;
@@ -252,8 +381,30 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("[AuditLogs] ========================================");
         Console.WriteLine("[AuditLogs] Initializing audit log viewer");
+        Console.WriteLine($"[AuditLogs] Initial state - showClearModal: {showClearModal}, isLoading: {isLoading}");
+        Console.WriteLine("[AuditLogs] Loading stats...");
+        await LoadStatsAsync();
+        Console.WriteLine("[AuditLogs] Loading logs...");
         await LoadLogsAsync();
+        Console.WriteLine($"[AuditLogs] Initialization complete - stats: {(stats != null ? "Loaded" : "NULL")}, logs: {response?.Logs.Count ?? 0}");
+        Console.WriteLine("[AuditLogs] ========================================");
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        try
+        {
+            stats = await AuditLogService.GetAuditLogStatsAsync();
+            Console.WriteLine($"[AuditLogs] Stats loaded - Total: {stats.TotalCount}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AuditLogs] Failed to load stats: {ex.Message}");
+            // Set default stats so UI still works
+            stats = new AuditLogStats { TotalCount = 0 };
+        }
     }
 
     private async Task ApplyFilters()
@@ -271,6 +422,7 @@
         selectedUser = "";
         currentPage = 1;
         await LoadLogsAsync();
+        await LoadStatsAsync();
     }
 
     private async Task LoadLogsAsync()
@@ -296,6 +448,21 @@
             response = await AuditLogService.GetAuditLogsAsync(query);
 
             Console.WriteLine($"[AuditLogs] Loaded {response.Logs.Count} logs (Total: {response.Pagination.Total})");
+            
+            // MINIMAL FIX: Update stats from logs response if stats endpoint failed
+            if (stats != null && stats.TotalCount == 0 && response.Pagination.Total > 0)
+            {
+                stats.TotalCount = response.Pagination.Total;
+                
+                // Get oldest/newest from the loaded logs (approximate)
+                if (response.Logs.Any())
+                {
+                    stats.NewestEntry = response.Logs.Max(l => l.Timestamp);
+                    stats.OldestEntry = response.Logs.Min(l => l.Timestamp);
+                }
+                
+                Console.WriteLine($"[AuditLogs] Stats updated from logs response - Total: {stats.TotalCount}");
+            }
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -375,6 +542,105 @@
         }
     }
 
+    private void ShowClearModal()
+    {
+        Console.WriteLine("[AuditLogs] ========================================");
+        Console.WriteLine("[AuditLogs] CLEAR BUTTON CLICKED!");
+        Console.WriteLine($"[AuditLogs] Current state - isLoading: {isLoading}, showClearModal: {showClearModal}");
+        Console.WriteLine($"[AuditLogs] Stats object: {(stats != null ? $"TotalCount={stats.TotalCount}" : "NULL")}");
+        Console.WriteLine("[AuditLogs] Setting showClearModal = true...");
+        
+        confirmText = "";
+        showClearModal = true;
+        
+        Console.WriteLine($"[AuditLogs] After setting - showClearModal: {showClearModal}, confirmText: '{confirmText}'");
+        Console.WriteLine("[AuditLogs] ShowClearModal method completed");
+        Console.WriteLine("[AuditLogs] ========================================");
+    }
+
+    private void CancelClear()
+    {
+        Console.WriteLine("[AuditLogs] ========================================");
+        Console.WriteLine("[AuditLogs] CANCEL BUTTON CLICKED!");
+        Console.WriteLine("[AuditLogs] Closing modal and clearing confirmation text...");
+        
+        confirmText = "";
+        showClearModal = false;
+        
+        Console.WriteLine($"[AuditLogs] After cancel - showClearModal: {showClearModal}");
+        Console.WriteLine("[AuditLogs] ========================================");
+    }
+
+    private async Task ConfirmClear()
+    {
+        Console.WriteLine("[AuditLogs] ========================================");
+        Console.WriteLine("[AuditLogs] DELETE BUTTON CLICKED!");
+        Console.WriteLine($"[AuditLogs] confirmText: '{confirmText}'");
+        Console.WriteLine($"[AuditLogs] confirmText == 'CLEAR': {confirmText == "CLEAR"}");
+        
+        if (confirmText != "CLEAR")
+        {
+            Console.WriteLine("[AuditLogs] Confirmation text does not match - showing error toast");
+            toast?.ShowError("Please type CLEAR to confirm deletion.");
+            return;
+        }
+
+        Console.WriteLine("[AuditLogs] Confirmation validated - proceeding with clear operation");
+        isClearing = true;
+        Console.WriteLine($"[AuditLogs] isClearing set to: {isClearing}");
+
+        try
+        {
+            Console.WriteLine("[AuditLogs] Calling AuditLogService.ClearAuditLogsAsync()...");
+            
+            // Pass user's actual input for API validation (defense-in-depth security)
+            var result = await AuditLogService.ClearAuditLogsAsync(confirmText);
+            
+            Console.WriteLine($"[AuditLogs] Clear operation returned - Success: {result.Success}, DeletedCount: {result.DeletedCount}");
+
+            if (result.Success)
+            {
+                Console.WriteLine($"[AuditLogs] Clear succeeded! Deleted {result.DeletedCount:N0} logs");
+                toast?.ShowSuccess($"Successfully deleted {result.DeletedCount:N0} audit log entries.");
+                Console.WriteLine("[AuditLogs] Refreshing stats and logs...");
+
+                // Refresh data
+                await LoadStatsAsync();
+                await LoadLogsAsync();
+                
+                Console.WriteLine("[AuditLogs] Data refreshed - closing modal");
+                // Close modal
+                showClearModal = false;
+                confirmText = "";
+                Console.WriteLine($"[AuditLogs] Modal closed - showClearModal: {showClearModal}");
+            }
+            else
+            {
+                Console.WriteLine($"[AuditLogs] Clear failed: {result.ErrorMessage}");
+                toast?.ShowError($"Failed to clear audit logs: {result.ErrorMessage}");
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Console.WriteLine($"[AuditLogs] Unauthorized exception: {ex.Message}");
+            toast?.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AuditLogs] Exception during clear: {ex.GetType().Name}");
+            Console.WriteLine($"[AuditLogs] Exception message: {ex.Message}");
+            Console.WriteLine($"[AuditLogs] Stack trace: {ex.StackTrace}");
+            toast?.ShowError($"Error clearing audit logs: {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("[AuditLogs] Clear operation completed - resetting isClearing flag");
+            isClearing = false;
+            Console.WriteLine($"[AuditLogs] isClearing set to: {isClearing}");
+            Console.WriteLine("[AuditLogs] ========================================");
+        }
+    }
+
     private string GetActionColor(string action)
     {
         if (action.Contains("Created")) return "success";
@@ -395,5 +661,45 @@
             "Unauthorized" => "warning",
             _ => "secondary"
         };
+    }
+
+    private string FormatFileSize(long? bytes)
+    {
+        if (!bytes.HasValue || bytes.Value == 0)
+            return "N/A";
+
+        var kb = bytes.Value / 1024.0;
+        var mb = kb / 1024.0;
+
+        if (mb >= 1)
+            return $"{mb:F2} MB";
+        if (kb >= 1)
+            return $"{kb:F2} KB";
+        return $"{bytes.Value} bytes";
+    }
+
+    /// <summary>
+    /// Gets the actual log count for the clear modal.
+    /// Uses response.Total if available, falls back to stats.TotalCount, then allQuotes count.
+    /// </summary>
+    private string GetLogCount()
+    {
+        // Priority 1: Use the actual total from the logs response (most accurate)
+        if (response?.Pagination?.Total > 0)
+        {
+            Console.WriteLine($"[AuditLogs] GetLogCount using response.Pagination.Total: {response.Pagination.Total}");
+            return response.Pagination.Total.ToString("N0");
+        }
+
+        // Priority 2: Use stats if available (may be outdated or 0 if endpoint not implemented)
+        if (stats?.TotalCount > 0)
+        {
+            Console.WriteLine($"[AuditLogs] GetLogCount using stats.TotalCount: {stats.TotalCount}");
+            return stats.TotalCount.ToString("N0");
+        }
+
+        // Priority 3: Fallback to "all logs" if no count available
+        Console.WriteLine("[AuditLogs] GetLogCount fallback: no accurate count available");
+        return "all";
     }
 }

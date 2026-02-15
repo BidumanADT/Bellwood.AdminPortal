@@ -187,6 +187,55 @@ public sealed class AuditLogResponse
 }
 
 /// <summary>
+/// Statistics about audit logs in the system.
+/// Phase 3: For audit log management and monitoring.
+/// </summary>
+public sealed class AuditLogStats
+{
+    /// <summary>
+    /// Total number of audit log entries in the system.
+    /// </summary>
+    public int TotalCount { get; set; }
+
+    /// <summary>
+    /// Timestamp of the oldest audit log entry (UTC).
+    /// </summary>
+    public DateTime? OldestEntry { get; set; }
+
+    /// <summary>
+    /// Timestamp of the most recent audit log entry (UTC).
+    /// </summary>
+    public DateTime? NewestEntry { get; set; }
+
+    /// <summary>
+    /// Approximate storage size in bytes (optional).
+    /// </summary>
+    public long? StorageSizeBytes { get; set; }
+}
+
+/// <summary>
+/// Result of clearing audit logs.
+/// Phase 3: Confirmation of destructive operation.
+/// </summary>
+public sealed class AuditLogClearResult
+{
+    /// <summary>
+    /// Whether the clear operation was successful.
+    /// </summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// Number of audit log entries that were deleted.
+    /// </summary>
+    public int DeletedCount { get; set; }
+
+    /// <summary>
+    /// Error message if the operation failed.
+    /// </summary>
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
 /// Predefined action types for audit logging.
 /// Phase 3: Common action patterns.
 /// </summary>
