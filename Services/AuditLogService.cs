@@ -261,6 +261,7 @@ public class AuditLogService : IAuditLogService
                 throw new UnauthorizedAccessException("Access denied. Admin role required to clear audit logs.");
             }
 
+            // Handle all other non-success responses
             if (!response.IsSuccessStatusCode)
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
@@ -272,21 +273,21 @@ public class AuditLogService : IAuditLogService
                 };
             }
 
+            // Deserialize response to get DeletedCount
             var result = await response.Content.ReadFromJsonAsync<AuditLogClearResult>();
 
-            if (result == null)
+            // HTTP 200 OK means success - trust the status code, not the response body fields
+            // AdminAPI may return different response format than we expect
+            var deletedCount = result?.DeletedCount ?? 0;
+            
+            _logger.LogWarning("[AuditLog] Successfully cleared {Count} audit logs", deletedCount);
+
+            return new AuditLogClearResult
             {
-                _logger.LogWarning("[AuditLog] Null clear result");
-                return new AuditLogClearResult
-                {
-                    Success = false,
-                    ErrorMessage = "No response from server"
-                };
-            }
-
-            _logger.LogWarning("[AuditLog] Successfully cleared {Count} audit logs", result.DeletedCount);
-
-            return result;
+                Success = true,  // HTTP 200 = operation succeeded
+                DeletedCount = deletedCount,
+                ErrorMessage = null
+            };
         }
         catch (UnauthorizedAccessException)
         {
