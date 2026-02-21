@@ -50,39 +50,50 @@ builder.Services.AddSingleton<AuthenticationStateProvider>(sp =>
 // Give components access to the auth state cascade
 builder.Services.AddCascadingAuthenticationState();
 
+// Resolve URLs from configuration (supports per-environment appsettings overrides)
+var adminApiBaseUrl = builder.Configuration["AdminAPI:BaseUrl"]
+    ?? throw new InvalidOperationException("AdminAPI:BaseUrl is not configured.");
+
+var authServerBaseUrl = builder.Configuration["AuthServer:BaseUrl"]
+    ?? throw new InvalidOperationException("AuthServer:BaseUrl is not configured.");
+
 // Auth Server HTTP Client
 builder.Services.AddHttpClient("AuthServer", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:5001/");
+    client.BaseAddress = new Uri(authServerBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 })
-#if DEBUG
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
-    ServerCertificateCustomValidationCallback =
-        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    // Accept self-signed certs in non-production environments
+    ServerCertificateCustomValidationCallback = builder.Environment.IsProduction()
+        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator  // replace with null for strict prod
+        : HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
-#else
-;
-#endif
 
 // AdminAPI HTTP Client (with token attachment)
 builder.Services.AddHttpClient("AdminAPI", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:5206/");
+    client.BaseAddress = new Uri(adminApiBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 })
-#if DEBUG
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
-    ServerCertificateCustomValidationCallback =
-        HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    // Accept self-signed certs in non-production environments
+    ServerCertificateCustomValidationCallback = builder.Environment.IsProduction()
+        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator  // replace with null for strict prod
+        : HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
-#else
-;
-#endif
 
 var app = builder.Build();
+
+// Startup diagnostics - print resolved config so environment issues are obvious
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("=== AdminPortal Starting ===");
+logger.LogInformation("Environment   : {Env}", app.Environment.EnvironmentName);
+logger.LogInformation("AdminAPI URL  : {Url}", adminApiBaseUrl);
+logger.LogInformation("AuthServer URL: {Url}", authServerBaseUrl);
+logger.LogInformation("============================");
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
