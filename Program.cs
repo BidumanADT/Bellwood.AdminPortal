@@ -1,8 +1,21 @@
 using Bellwood.AdminPortal.Components;
+using Bellwood.AdminPortal.Observability;
 using Bellwood.AdminPortal.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Serilog;
+using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("service", "AdminPortal")
+    .Enrich.WithProperty("environment", "Alpha")
+    .WriteTo.Console()
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Razor components (Blazor Web App - Server interactivity)
 builder.Services.AddRazorComponents()
@@ -10,7 +23,7 @@ builder.Services.AddRazorComponents()
 
 // Phase 2 Fix: Add authentication services for [Authorize] attribute support
 builder.Services.AddAuthentication()
-    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, 
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
         BlazorAuthenticationHandler>("Blazor", options => { });
 
 // Blazor-style auth with policies
@@ -19,6 +32,10 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
     options.AddPolicy("StaffOnly", policy => policy.RequireRole("admin", "dispatcher"));
 });
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
+builder.Services.AddTransient<CorrelationIdPropagationHandler>();
 
 // Token store + auth state provider - MUST BE SINGLETON to persist across circuits
 builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
@@ -63,6 +80,11 @@ builder.Services.AddHttpClient("AuthServer", client =>
     client.BaseAddress = new Uri(authServerBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 })
+.AddHttpMessageHandler<CorrelationIdPropagationHandler>()
+.AddHttpMessageHandler(sp => new OutboundHttpLoggingHandler(
+    sp.GetRequiredService<ILogger<OutboundHttpLoggingHandler>>(),
+    sp.GetRequiredService<ICorrelationContextAccessor>(),
+    "AuthServer"))
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
     // Accept self-signed certs in non-production environments
@@ -77,6 +99,11 @@ builder.Services.AddHttpClient("AdminAPI", client =>
     client.BaseAddress = new Uri(adminApiBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
 })
+.AddHttpMessageHandler<CorrelationIdPropagationHandler>()
+.AddHttpMessageHandler(sp => new OutboundHttpLoggingHandler(
+    sp.GetRequiredService<ILogger<OutboundHttpLoggingHandler>>(),
+    sp.GetRequiredService<ICorrelationContextAccessor>(),
+    "AdminAPI"))
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
     // Accept self-signed certs in non-production environments
@@ -102,12 +129,28 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseMiddleware<CorrelationLoggingMiddleware>();
+app.UseSerilogRequestLogging();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 // Phase 2 Fix: Add authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.Use(async (context, next) =>
+{
+    var userId = context.User?.FindFirst("sub")?.Value
+        ?? context.User?.FindFirst("uid")?.Value
+        ?? context.User?.Identity?.Name
+        ?? "anonymous";
+
+    using (LogContext.PushProperty("userId", userId))
+    {
+        await next();
+    }
+});
 
 app.UseAntiforgery();
 
