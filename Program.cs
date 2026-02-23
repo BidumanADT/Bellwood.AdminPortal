@@ -11,7 +11,7 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("service", "AdminPortal")
-    .Enrich.WithProperty("environment", "Alpha")
+    .Enrich.WithProperty("environment", builder.Environment.EnvironmentName)
     .WriteTo.Console()
     .CreateLogger();
 
