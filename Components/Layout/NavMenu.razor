@@ -3,8 +3,8 @@
 @inject IQuoteService QuoteService
 @implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
+<div class="bw-sidebar-brand ps-3">
+    <div class="d-flex align-items-center justify-content-between pe-2" style="height:100%">
         <a class="navbar-brand" href="" style="display: flex; align-items: center; gap: 10px;">
             <img src="/images/bellwood_elite_icon.png" 
                  alt="Bellwood Elite" 
@@ -112,39 +112,48 @@
 @code {
     private int pendingQuoteCount = 0;
     private System.Threading.Timer? _pollingTimer;
+    private bool _disposed = false;
 
     protected override void OnInitialized()
     {
-        // Start polling for pending quotes every 30 seconds
-        _pollingTimer = new System.Threading.Timer(async _ =>
+        // Use a safe polling pattern: fire-and-forget with full exception guard.
+        // Timer callback is NOT async void — it posts onto the Blazor sync context
+        // via InvokeAsync so unhandled exceptions cannot kill the circuit.
+        _pollingTimer = new System.Threading.Timer(_ =>
         {
-            await CheckPendingQuotes();
+            // Discard the Task intentionally — exceptions are swallowed inside CheckPendingQuotes
+            _ = InvokeAsync(async () =>
+            {
+                if (!_disposed)
+                    await CheckPendingQuotesAsync();
+            });
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
     }
 
-    private async Task CheckPendingQuotes()
+    private async Task CheckPendingQuotesAsync()
     {
         try
         {
             var quotes = await QuoteService.GetQuotesAsync(take: 100);
             var newCount = quotes.Count(q => q.Status == "Pending");
-            
+
             if (newCount != pendingQuoteCount)
             {
                 pendingQuoteCount = newCount;
-                await InvokeAsync(StateHasChanged);
+                StateHasChanged();
                 Console.WriteLine($"[NavMenu] Pending quote count updated: {pendingQuoteCount}");
             }
         }
         catch (Exception ex)
         {
-            // Silent fail - don't break navigation if quote polling fails
+            // Silent fail — never let polling break navigation or the circuit
             Console.WriteLine($"[NavMenu] Failed to check pending quotes: {ex.Message}");
         }
     }
 
     public void Dispose()
     {
+        _disposed = true;
         _pollingTimer?.Dispose();
     }
 }

@@ -6,25 +6,31 @@
 
 main {
     flex: 1;
+    /* Prevent content from collapsing under the sidebar on wide screens */
+    min-width: 0;
 }
 
 .sidebar {
     background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
 }
 
+/* Top bar above article content — kept intentionally slim */
 .top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(203, 161, 53, 0.2);
     justify-content: flex-end;
-    height: 3.5rem;
+    height: 1.75rem;       /* ~half the original 3.5rem */
     display: flex;
     align-items: center;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
         white-space: nowrap;
         margin-left: 1.5rem;
         text-decoration: none;
+        font-size: 0.75rem;
     }
 
     .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
@@ -52,10 +58,11 @@ main {
     }
 
     .sidebar {
-        width: 250px;
+        width: 240px;
         height: 100vh;
         position: sticky;
         top: 0;
+        flex-shrink: 0;
     }
 
     .top-row {
@@ -75,22 +82,3 @@ main {
         padding-right: 1.5rem !important;
     }
 }
-
-#blazor-error-ui {
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 1000;
-}
-
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
-    }

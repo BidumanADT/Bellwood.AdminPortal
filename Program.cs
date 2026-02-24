@@ -7,6 +7,11 @@ using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure scoped CSS bundle (Bellwood.AdminPortal.styles.css) is served
+// in non-Development environments. In Development the SDK enables this
+// automatically; in Alpha/Production it must be called explicitly.
+builder.WebHost.UseStaticWebAssets();
+
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
@@ -74,7 +79,7 @@ var adminApiBaseUrl = builder.Configuration["AdminAPI:BaseUrl"]
 var authServerBaseUrl = builder.Configuration["AuthServer:BaseUrl"]
     ?? throw new InvalidOperationException("AuthServer:BaseUrl is not configured.");
 
-// Auth Server HTTP Client
+/// Auth Server HTTP Client
 builder.Services.AddHttpClient("AuthServer", client =>
 {
     client.BaseAddress = new Uri(authServerBaseUrl);

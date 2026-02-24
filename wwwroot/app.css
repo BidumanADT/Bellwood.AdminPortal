@@ -49,3 +49,11 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+/* Suppress the Blazor circuit error toast globally.
+   Must be here (global CSS) — not in a *.razor.css scoped file,
+   where the generated scope attribute selector would never match
+   this framework-injected element. */
+#blazor-error-ui {
+    display: none !important;
+}
