@@ -66,9 +66,9 @@ main {
     }
 
     .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
+        /* Not sticky — allows article content to flow naturally below this strip
+           instead of sliding underneath it. */
+        position: static;
     }
 
     .top-row.auth ::deep a:first-child {
