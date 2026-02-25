@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="css/bellwood.css" />
+    @* Scoped-CSS bundle produced by the Blazor build from *.razor.css files.
+       Served as a static web asset by the framework — NOT a file in wwwroot.
+       Required for NavMenu.razor.css and MainLayout.razor.css scoped styles. *@
     <link rel="stylesheet" href="Bellwood.AdminPortal.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="InteractiveServer" />
@@ -29,7 +32,8 @@
                     {
                         <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
                             <NotAuthorized>
-                                <RedirectToLogin ReturnUrl="/login" />
+                                @* Inline redirect — avoids the missing RedirectToLogin component warning *@
+                                <script>window.location.replace('/login');</script>
                             </NotAuthorized>
                         </AuthorizeRouteView>
                     }
