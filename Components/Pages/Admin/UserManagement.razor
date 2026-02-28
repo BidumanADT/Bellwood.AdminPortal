@@ -171,6 +171,26 @@
                                     <input type="email" class="form-control" @bind="newUserEmail" />
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label text-white">
+                                        First Name
+                                        @if (selectedCreateRoles.Contains("booker"))
+                                        {
+                                            <span class="text-danger ms-1">*</span>
+                                        }
+                                    </label>
+                                    <input type="text" class="form-control" @bind="newUserFirstName" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-white">
+                                        Last Name
+                                        @if (selectedCreateRoles.Contains("booker"))
+                                        {
+                                            <span class="text-danger ms-1">*</span>
+                                        }
+                                    </label>
+                                    <input type="text" class="form-control" @bind="newUserLastName" />
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label text-white">Roles</label>
                                     <div class="d-flex flex-wrap gap-3">
                                         @foreach (var role in availableRoles)
@@ -185,6 +205,17 @@
                                         }
                                     </div>
                                 </div>
+                                @if (selectedCreateRoles.Contains("booker"))
+                                {
+                                    <div class="mb-3">
+                                        <label class="form-label text-white">
+                                            Phone <span class="text-danger ms-1">*</span>
+                                        </label>
+                                        <input type="tel" class="form-control" @bind="newUserPhone"
+                                               placeholder="(555) 000-0000" />
+                                        <small class="text-muted">Required so the booker can be contacted at ride time.</small>
+                                    </div>
+                                }
                                 <div class="mb-3">
                                     <label class="form-label text-white">Temporary Password</label>
                                     <input type="password" class="form-control" @bind="temporaryPassword" />
@@ -318,6 +349,9 @@
     private HashSet<string> selectedCreateRoles = new(StringComparer.OrdinalIgnoreCase);
 
     private string newUserEmail = string.Empty;
+    private string newUserFirstName = string.Empty;
+    private string newUserLastName = string.Empty;
+    private string newUserPhone = string.Empty;
     private string temporaryPassword = string.Empty;
     private string confirmPassword = string.Empty;
 
@@ -466,30 +500,65 @@
         errorMessage = null;
         successMessage = null;
 
+        // Capture form values now; CloseCreateModal() will clear the bindings.
+        var isBooker = selectedCreateRoles.Contains("booker");
+        var email = newUserEmail.Trim();
+        var firstName = newUserFirstName.Trim();
+        var lastName = newUserLastName.Trim();
+        var phone = newUserPhone.Trim();
+
         try
         {
-            // AdminAPI expects roles as an array: ["booker"] not "booker"
             var request = new CreateUserRequest
             {
-                Email = newUserEmail.Trim(),
-                Roles = selectedCreateRoles.ToList(),  // ← Already a List<string>
+                Email = email,
+                FirstName = string.IsNullOrEmpty(firstName) ? null : firstName,
+                LastName = string.IsNullOrEmpty(lastName) ? null : lastName,
+                Roles = selectedCreateRoles.ToList(),
                 TemporaryPassword = temporaryPassword
             };
 
             var result = await UserService.CreateUserAsync(request);
 
-            if (result.Success)
-            {
-                successMessage = $"User {request.Email} created successfully.";
-                toast?.ShowSuccess(successMessage);
-                CloseCreateModal();
-                await LoadUsersAsync();
-            }
-            else
+            if (!result.Success)
             {
                 errorMessage = result.Message ?? "Failed to create user.";
                 toast?.ShowError(errorMessage);
+                return;
             }
+
+            // For booker accounts, persist the phone (and name) on the booker profile.
+            if (isBooker && !string.IsNullOrEmpty(result.UserId))
+            {
+                var profileResult = await UserService.UpdateBookerProfileAsync(
+                    result.UserId,
+                    new UpdateBookerProfileRequest
+                    {
+                        FirstName = firstName,
+                        LastName = lastName,
+                        Phone = phone
+                    });
+
+                if (!profileResult.Success)
+                {
+                    // User was created; only the profile update failed — warn, don't block.
+                    successMessage = $"Booker {email} created. Warning: phone could not be saved — {profileResult.Message}";
+                    toast?.ShowSuccess(successMessage);
+                }
+                else
+                {
+                    successMessage = $"Booker {email} created successfully.";
+                    toast?.ShowSuccess(successMessage);
+                }
+            }
+            else
+            {
+                successMessage = $"User {email} created successfully.";
+                toast?.ShowSuccess(successMessage);
+            }
+
+            CloseCreateModal();
+            await LoadUsersAsync();
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -599,24 +668,26 @@
     private string? ValidateCreateForm()
     {
         if (string.IsNullOrWhiteSpace(newUserEmail))
-        {
             return "Email is required.";
-        }
 
         if (!selectedCreateRoles.Any())
-        {
             return "Select at least one role.";
+
+        if (selectedCreateRoles.Contains("booker"))
+        {
+            if (string.IsNullOrWhiteSpace(newUserFirstName))
+                return "First name is required for booker accounts.";
+            if (string.IsNullOrWhiteSpace(newUserLastName))
+                return "Last name is required for booker accounts.";
+            if (string.IsNullOrWhiteSpace(newUserPhone))
+                return "Phone number is required for booker accounts.";
         }
 
         if (string.IsNullOrWhiteSpace(temporaryPassword) || temporaryPassword.Length < 10)
-        {
             return "Temporary password must be at least 10 characters.";
-        }
 
         if (!string.Equals(temporaryPassword, confirmPassword, StringComparison.Ordinal))
-        {
             return "Temporary password and confirmation do not match.";
-        }
 
         return null;
     }
@@ -624,6 +695,9 @@
     private void ClearCreateForm()
     {
         newUserEmail = string.Empty;
+        newUserFirstName = string.Empty;
+        newUserLastName = string.Empty;
+        newUserPhone = string.Empty;
         temporaryPassword = string.Empty;
         confirmPassword = string.Empty;
         selectedCreateRoles.Clear();

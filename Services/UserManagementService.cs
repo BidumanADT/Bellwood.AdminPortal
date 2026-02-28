@@ -10,6 +10,12 @@ public interface IUserManagementService
     Task<UserActionResult> CreateUserAsync(CreateUserRequest request);
     Task<UserActionResult> UpdateUserRoleAsync(string userId, string role);
     Task<UserActionResult> SetUserDisabledAsync(string userId, bool isDisabled);
+
+    /// <summary>
+    /// Calls PUT /api/bookers/{userId} to persist phone (and name) on the booker profile.
+    /// Only invoked after a successful user creation when the booker role is assigned.
+    /// </summary>
+    Task<UserActionResult> UpdateBookerProfileAsync(string userId, UpdateBookerProfileRequest request);
 }
 
 public class UserManagementService : IUserManagementService
@@ -140,8 +146,22 @@ public class UserManagementService : IUserManagementService
                 return new UserActionResult { Success = false, Message = message };
             }
 
-            _logger.LogInformation("[UserManagement] Successfully created user {Email}", request.Email);
-            return new UserActionResult { Success = true };
+            // Parse the created user's ID so callers can chain a booker-profile update.
+            string? createdUserId = null;
+            try
+            {
+                var created = await response.Content.ReadFromJsonAsync<UserDto>(
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                createdUserId = created?.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[UserManagement] Could not parse userId from create-user response");
+            }
+
+            _logger.LogInformation("[UserManagement] Successfully created user {Email} (userId={UserId})",
+                request.Email, createdUserId ?? "<unknown>");
+            return new UserActionResult { Success = true, UserId = createdUserId };
         }
         catch (UnauthorizedAccessException)
         {
@@ -241,6 +261,44 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "[UserManagement] Failed to update disable status for {UserId}", userId);
+            throw;
+        }
+    }
+
+    public async Task<UserActionResult> UpdateBookerProfileAsync(string userId, UpdateBookerProfileRequest request)
+    {
+        try
+        {
+            var client = await GetAuthorizedClientAsync();
+
+            _logger.LogInformation("[UserManagement] Updating booker profile for user {UserId}", userId);
+
+            var response = await client.PutAsJsonAsync($"/api/bookers/{userId}", request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("[UserManagement] Access denied updating booker profile for {UserId}", userId);
+                throw new UnauthorizedAccessException("Access denied. Admin role required to update booker profiles.");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await ReadErrorMessageAsync(response);
+                _logger.LogError("[UserManagement] Booker profile update failed for {UserId}: {Status} - {Message}",
+                    userId, response.StatusCode, message);
+                return new UserActionResult { Success = false, Message = message };
+            }
+
+            _logger.LogInformation("[UserManagement] Successfully updated booker profile for {UserId}", userId);
+            return new UserActionResult { Success = true };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[UserManagement] Failed to update booker profile for {UserId}", userId);
             throw;
         }
     }
