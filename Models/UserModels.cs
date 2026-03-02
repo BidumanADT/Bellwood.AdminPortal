@@ -77,10 +77,16 @@ public class CreateUserRequest
 {
     [JsonPropertyName("email")]
     public string Email { get; set; } = string.Empty;
-    
+
+    [JsonPropertyName("firstName")]
+    public string? FirstName { get; set; }
+
+    [JsonPropertyName("lastName")]
+    public string? LastName { get; set; }
+
     [JsonPropertyName("roles")]
     public List<string> Roles { get; set; } = new();
-    
+
     /// <summary>
     /// Temporary password - must match AdminAPI field name "tempPassword"
     /// </summary>
@@ -103,4 +109,34 @@ public class UserActionResult
     public bool Success { get; set; }
     public string? Message { get; set; }
     public bool EndpointNotFound { get; set; }
+
+    /// <summary>
+    /// Populated on successful user creation; used to chain the booker-profile update.
+    /// </summary>
+    public string? UserId { get; set; }
+}
+
+/// <summary>
+/// Body for PUT /api/bookers/{userId} — persists booker-specific contact info
+/// that is NOT sent in the initial POST /users payload.
+/// </summary>
+public class UpdateBookerProfileRequest
+{
+    [JsonPropertyName("firstName")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastName")]
+    public string LastName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Must match the booker's login email.  Required by the Admin API.
+    /// </summary>
+    [JsonPropertyName("emailAddress")]
+    public string EmailAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// JSON property is "phoneNumber" — the Admin API rejects "phone".
+    /// </summary>
+    [JsonPropertyName("phoneNumber")]
+    public string PhoneNumber { get; set; } = string.Empty;
 }
