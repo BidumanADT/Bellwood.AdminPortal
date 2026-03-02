@@ -534,9 +534,10 @@
                     result.UserId,
                     new UpdateBookerProfileRequest
                     {
-                        FirstName = firstName,
-                        LastName = lastName,
-                        Phone = phone
+                        FirstName    = firstName,
+                        LastName     = lastName,
+                        EmailAddress = email,       // required by Admin API
+                        PhoneNumber  = phone        // was "Phone"; API expects "phoneNumber"
                     });
 
                 if (!profileResult.Success)

@@ -128,6 +128,15 @@ public class UpdateBookerProfileRequest
     [JsonPropertyName("lastName")]
     public string LastName { get; set; } = string.Empty;
 
-    [JsonPropertyName("phone")]
-    public string Phone { get; set; } = string.Empty;
+    /// <summary>
+    /// Must match the booker's login email.  Required by the Admin API.
+    /// </summary>
+    [JsonPropertyName("emailAddress")]
+    public string EmailAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// JSON property is "phoneNumber" — the Admin API rejects "phone".
+    /// </summary>
+    [JsonPropertyName("phoneNumber")]
+    public string PhoneNumber { get; set; } = string.Empty;
 }
