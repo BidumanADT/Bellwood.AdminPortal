@@ -10,6 +10,7 @@
 @inject IAdminApiKeyProvider ApiKeyProvider
 @inject IAffiliateService AffiliateService
 @inject IDriverTrackingService TrackingService
+@inject IBookingService BookingService
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
@@ -58,12 +59,12 @@
                                 <div class="mb-3">
                                     <strong>Status:</strong>
                                     <span class="status-chip status-@(booking.DisplayStatus.ToLower())">
-                                        @booking.DisplayStatus
+                                        @GetBookingStatusLabel(booking.DisplayStatus)
                                     </span>
                                     @if (!string.IsNullOrEmpty(booking.CurrentRideStatus) && booking.CurrentRideStatus != booking.Status)
                                     {
                                         <br />
-                                        <small class="text-muted">Booking Status: @booking.Status</small>
+                                        <small class="text-muted">Booking Status: @GetBookingStatusLabel(booking.Status)</small>
                                     }
                                 </div>
 
@@ -166,8 +167,96 @@
                         }
                     </div>
 
-                    <!-- Driver Assignment Card -->
+                    <!-- Right Column: Acknowledge + Driver Assignment -->
                     <div class="col-lg-6 mb-4">
+
+                        <!-- Step 1: Acknowledge Receipt (Requested → Received) -->
+                        @if (booking?.Status?.Equals("Requested", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            <div class="card mb-4" style="border-left: 4px solid #6b7280;">
+                                <div class="card-body">
+                                    <h4 class="card-title mb-1">📬 New Booking Request</h4>
+                                    <p class="text-muted small mb-3">
+                                        Acknowledge receipt to let the booker know their request has been
+                                        received and is under review. No message is sent at this step.
+                                    </p>
+
+                                    @if (!string.IsNullOrEmpty(actionSuccessMessage))
+                                    {
+                                        <div class="alert alert-success mb-3">✅ @actionSuccessMessage</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(actionErrorMessage))
+                                    {
+                                        <div class="alert alert-danger mb-3">❌ @actionErrorMessage</div>
+                                    }
+
+                                    <button class="btn btn-secondary" @onclick="ReceiveBooking" disabled="@isReceiving">
+                                        @if (isReceiving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        📬 Acknowledge Receipt
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Step 2: Confirm Reservation (Received → Confirmed) -->
+                        @if (booking?.Status?.Equals("Received", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            <div class="card mb-4" style="border-left: 4px solid #f59e0b;">
+                                <div class="card-body">
+                                    <h4 class="card-title mb-1">✅ Confirm Reservation</h4>
+                                    <p class="text-muted small mb-3">
+                                        Send the booker a confirmation message and finalize their reservation.
+                                    </p>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            Message to Booker <span class="text-danger">*</span>
+                                        </label>
+                                        <textarea class="form-control" rows="4"
+                                                  maxlength="2000"
+                                                  @bind="confirmMessage"></textarea>
+                                        <small class="form-text text-muted">
+                                            Sent directly to <strong>@booking.BookerName</strong>. Edit before sending.
+                                            Max 2000 characters.
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">
+                                            Internal Notes
+                                            <span class="text-muted fw-normal">(optional — not sent to booker)</span>
+                                        </label>
+                                        <textarea class="form-control" rows="3"
+                                                  maxlength="1000"
+                                                  placeholder="e.g., 3 passengers — sedan requested, upgrading to SUV. Affiliate notified."
+                                                  @bind="confirmNotes"></textarea>
+                                        <small class="form-text text-muted">Max 1000 characters.</small>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(actionSuccessMessage))
+                                    {
+                                        <div class="alert alert-success mb-3">✅ @actionSuccessMessage</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(actionErrorMessage))
+                                    {
+                                        <div class="alert alert-danger mb-3">❌ @actionErrorMessage</div>
+                                    }
+
+                                    <button class="btn btn-success" @onclick="ConfirmBooking" disabled="@(isConfirming || string.IsNullOrWhiteSpace(confirmMessage))">
+                                        @if (isConfirming)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        ✅ Confirm Reservation
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Driver Assignment Card -->
                         <div class="card">
                             <div class="card-body">
                                 <h4 class="card-title mb-3">Driver Assignment</h4>
@@ -279,7 +368,7 @@
                                                                             <small class="text-muted">@driver.Phone</small>
                                                                             @if (!string.IsNullOrEmpty(driver.UserUid))
                                                                             {
-                                                                                <small class="text-muted"> � UID: @driver.UserUid</small>
+                                                                                <small class="text-muted"> � UID: @driver.UserUid</small>
                                                                             }
                                                                         </div>
                                                                         <button class="btn btn-sm btn-primary" 
@@ -384,7 +473,17 @@
     private bool isAssigning = false;
     private bool isAddingDriver = false;
     private bool showAddDriverForm = false;
-    
+
+    // Two-step booking workflow fields
+    private bool isReceiving = false;
+    private bool isConfirming = false;
+    private string confirmMessage =
+        "Your reservation is confirmed. Our team has reviewed all the details and we look " +
+        "forward to serving you. You will receive further information from your driver prior to pickup.";
+    private string confirmNotes = string.Empty;
+    private string? actionSuccessMessage;
+    private string? actionErrorMessage;
+
     private string? selectedDriverId;
     private string? addDriverAffiliateId;
     private string newDriverName = string.Empty;
@@ -589,6 +688,90 @@
             selectedDriverId = null;
         }
     }
+
+    private async Task ReceiveBooking()
+    {
+        if (booking == null) return;
+
+        isReceiving = true;
+        actionSuccessMessage = null;
+        actionErrorMessage = null;
+
+        try
+        {
+            await BookingService.ReceiveBookingAsync(BookingId);
+
+            actionSuccessMessage = "Receipt acknowledged. Booking is now Under Review.";
+
+            // Reload so the panel transitions from step 1 to step 2
+            await LoadBookingAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            actionErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            actionErrorMessage = $"Failed to acknowledge receipt: {ex.Message}";
+            Console.WriteLine($"[BookingDetail] Error acknowledging receipt: {ex}");
+        }
+        finally
+        {
+            isReceiving = false;
+        }
+    }
+
+    private async Task ConfirmBooking()
+    {
+        if (booking == null) return;
+
+        isConfirming = true;
+        actionSuccessMessage = null;
+        actionErrorMessage = null;
+
+        try
+        {
+            var request = new ConfirmBookingRequest
+            {
+                MessageToPassenger = confirmMessage,
+                Notes = string.IsNullOrWhiteSpace(confirmNotes) ? null : confirmNotes.Trim()
+            };
+
+            await BookingService.ConfirmBookingAsync(BookingId, request);
+
+            actionSuccessMessage = "Reservation confirmed. The booker has been notified.";
+            confirmNotes = string.Empty;
+
+            // Reload so the panel disappears and status updates to Confirmed
+            await LoadBookingAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            actionErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            actionErrorMessage = $"Failed to confirm reservation: {ex.Message}";
+            Console.WriteLine($"[BookingDetail] Error confirming booking: {ex}");
+        }
+        finally
+        {
+            isConfirming = false;
+        }
+    }
+
+    private static string GetBookingStatusLabel(string? status) => status switch
+    {
+        "Requested"  => "Pending Review",
+        "Received"   => "Under Review",
+        "Confirmed"  => "Confirmed",
+        "Scheduled"  => "Scheduled",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        "NoShow"     => "No Show",
+        _            => status ?? "Unknown"
+    };
 
     private void ShowAddDriverForm(string affiliateId)
     {
