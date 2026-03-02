@@ -172,29 +172,54 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Booking Status Colors */
+
+/* Requested — internal only, grey (Pending Review) */
 .status-requested {
+    background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
+    color: white;
+}
+
+/* Received — amber (Under Review, customer-visible) */
+.status-received {
     background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
     color: white;
 }
 
+/* Confirmed — green */
 .status-confirmed {
     background: linear-gradient(135deg, #059669 0%, #10b981 100%);
     color: white;
 }
 
+/* Scheduled — blue */
+.status-scheduled {
+    background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+    color: white;
+}
+
+/* InProgress — gold/active (API value "InProgress" → ToLower() = "inprogress") */
+.status-inprogress,
 .status-in-progress {
     background: linear-gradient(135deg, var(--bellwood-gold) 0%, var(--bellwood-gold-light) 100%);
     color: var(--bellwood-ink);
 }
 
+/* Completed — muted grey-green */
 .status-completed {
     background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
     color: white;
 }
 
+/* Cancelled — red */
 .status-cancelled {
     background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
     color: white;
+}
+
+/* NoShow — muted red (API value "NoShow" → ToLower() = "noshow") */
+.status-noshow {
+    background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* Quote Status Colors */

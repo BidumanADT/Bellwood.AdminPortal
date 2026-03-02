@@ -34,9 +34,13 @@
                                 @onclick='() => FilterBookings("All")'>
                             All (@allBookings.Count)
                         </button>
-                        <button class="btn @(selectedFilter == "Requested" ? "btn-warning" : "btn-outline-secondary")"
+                        <button class="btn @(selectedFilter == "Requested" ? "btn-secondary" : "btn-outline-secondary")"
                                 @onclick='() => FilterBookings("Requested")'>
-                            Requested (@GetCountByStatus("Requested"))
+                            Pending Review (@GetCountByStatus("Requested"))
+                        </button>
+                        <button class="btn @(selectedFilter == "Received" ? "btn-warning" : "btn-outline-secondary")"
+                                @onclick='() => FilterBookings("Received")'>
+                            Under Review (@GetCountByStatus("Received"))
                         </button>
                         <button class="btn @(selectedFilter == "Confirmed" ? "btn-success" : "btn-outline-secondary")"
                                 @onclick='() => FilterBookings("Confirmed")'>
@@ -103,7 +107,7 @@
                                                 <span class="tracking-indicator" title="Tracking Active">📍</span>
                                             }
                                             <span class="status-chip status-@(booking.DisplayStatus.ToLower())">
-                                                @booking.DisplayStatus
+                                                @GetBookingStatusLabel(booking.DisplayStatus)
                                             </span>
                                         </div>
                                     </div>
@@ -128,7 +132,7 @@
                                         }
                                     </p>
                                     <p class="card-text small mt-1">
-                                        <strong>Status:</strong> @booking.DisplayStatus
+                                        <strong>Status:</strong> @GetBookingStatusLabel(booking.DisplayStatus)
                                     </p>
                                 </div>
                             </div>
@@ -315,9 +319,22 @@
         return allBookings.Count(IsTrackable);
     }
 
+    private static string GetBookingStatusLabel(string? status) => status switch
+    {
+        "Requested"  => "Pending Review",
+        "Received"   => "Under Review",
+        "Confirmed"  => "Confirmed",
+        "Scheduled"  => "Scheduled",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        "NoShow"     => "No Show",
+        _            => status ?? "Unknown"
+    };
+
     /// <summary>
     /// Determines if a booking is in a trackable state.
-    /// Checks CurrentRideStatus first (real-time driver state), 
+    /// Checks CurrentRideStatus first (real-time driver state),
     /// then falls back to Status for InProgress bookings.
     /// </summary>
     private bool IsTrackable(BookingListItem booking)
