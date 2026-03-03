@@ -50,6 +50,7 @@ builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
 builder.Services.AddScoped<IAffiliateService, AffiliateService>();
 builder.Services.AddScoped<IQuoteService, QuoteService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IProfileApiService, ProfileApiService>();
 
 // Driver tracking service - scoped to allow per-circuit SignalR connections
 builder.Services.AddScoped<IDriverTrackingService, DriverTrackingService>();

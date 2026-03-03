@@ -6,6 +6,7 @@
 @using Bellwood.AdminPortal.Services
 @using Bellwood.AdminPortal.Components.Shared
 @inject IUserManagementService UserService
+@inject IProfileApiService ProfileService
 @inject NavigationManager Navigation
 
 <PageTitle>User Management - Bellwood Elite</PageTitle>
@@ -122,6 +123,13 @@
                                                         @onclick="() => ShowRoleChangeModal(user)">
                                                     Edit Roles
                                                 </button>
+                                                @if (IsBookerUser(user))
+                                                {
+                                                    <button class="btn btn-sm btn-outline-info"
+                                                            @onclick="() => ShowProfileModal(user)">
+                                                        👤 Profile
+                                                    </button>
+                                                }
                                                 @if (disableEndpointAvailable)
                                                 {
                                                     <button class="btn btn-sm @(user.IsDisabled ? "btn-outline-success" : "btn-outline-danger")"
@@ -155,7 +163,7 @@
                 </div>
             }
 
-            <!-- Create User Modal -->
+            <!-- ── Create User Modal ────────────────────────────────────────── -->
             @if (showCreateModal)
             {
                 <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
@@ -241,7 +249,7 @@
                 </div>
             }
 
-            <!-- Role Change Modal -->
+            <!-- ── Role Change Modal ────────────────────────────────────────── -->
             @if (showRolesModal && selectedUser != null)
             {
                 <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
@@ -253,7 +261,7 @@
                             </div>
                             <div class="modal-body">
                                 <p class="text-light">
-                                    <strong class="text-white">User:</strong> 
+                                    <strong class="text-white">User:</strong>
                                     <span class="text-bellwood-gold">
                                         @if (!string.IsNullOrEmpty(selectedUser.Username))
                                         {
@@ -316,6 +324,246 @@
                     </div>
                 </div>
             }
+
+            <!-- ── Booker Profile Modal (Saved Passengers + Saved Locations) ── -->
+            @if (showProfileModal && profileUser != null)
+            {
+                <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+                    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                        <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
+                            <div class="modal-header">
+                                <h5 class="modal-title text-white">
+                                    👤 Booker Profile —
+                                    <span class="text-bellwood-gold">
+                                        @(!string.IsNullOrEmpty(profileUser.Username) ? profileUser.Username : profileUser.Email)
+                                    </span>
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CloseProfileModal"></button>
+                            </div>
+
+                            <!-- Tab bar -->
+                            <div class="px-3 pt-2">
+                                <ul class="nav nav-tabs">
+                                    <li class="nav-item">
+                                        <button class="nav-link @(profileTab == "passengers" ? "active" : "text-light")"
+                                                @onclick='() => profileTab = "passengers"'>
+                                            🧑 Saved Passengers
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link @(profileTab == "locations" ? "active" : "text-light")"
+                                                @onclick='() => profileTab = "locations"'>
+                                            📍 Saved Locations
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="modal-body">
+                                @if (isProfileLoading)
+                                {
+                                    <div class="text-center py-4">
+                                        <div class="spinner-border text-bellwood-gold" role="status"></div>
+                                        <p class="mt-2 text-muted">Loading…</p>
+                                    </div>
+                                }
+                                else if (!string.IsNullOrEmpty(profileError))
+                                {
+                                    <div class="alert alert-danger">⚠️ @profileError</div>
+                                }
+                                else if (profileTab == "passengers")
+                                {
+                                    <!-- Saved Passengers tab -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="text-white mb-0">Saved Passengers (@savedPassengers.Count)</h6>
+                                        <button class="btn btn-sm btn-primary" @onclick="ShowAddPassengerForm">
+                                            ➕ Add Passenger
+                                        </button>
+                                    </div>
+
+                                    @if (showPassengerForm)
+                                    {
+                                        <div class="card mb-3" style="border: 1px solid var(--bellwood-gold);">
+                                            <div class="card-body">
+                                                <h6 class="text-white">@(editingPassengerId == null ? "New Passenger" : "Edit Passenger")</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">First Name <span class="text-danger">*</span></label>
+                                                        <input type="text" class="form-control" @bind="paxFirstName" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Last Name <span class="text-danger">*</span></label>
+                                                        <input type="text" class="form-control" @bind="paxLastName" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Phone</label>
+                                                        <input type="tel" class="form-control" @bind="paxPhone" placeholder="(555) 000-0000" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Email</label>
+                                                        <input type="email" class="form-control" @bind="paxEmail" />
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(paxFormError))
+                                                {
+                                                    <div class="alert alert-danger mt-2 py-1">@paxFormError</div>
+                                                }
+                                                <div class="mt-3 d-flex gap-2">
+                                                    <button class="btn btn-primary btn-sm" @onclick="SavePassengerAsync" disabled="@isSavingPassenger">
+                                                        @if (isSavingPassenger) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                        Save
+                                                    </button>
+                                                    <button class="btn btn-secondary btn-sm" @onclick="CancelPassengerForm">Cancel</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    @if (!savedPassengers.Any())
+                                    {
+                                        <div class="alert alert-info">No saved passengers yet.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="text-white">Name</th>
+                                                        <th class="text-white">Phone</th>
+                                                        <th class="text-white">Email</th>
+                                                        <th class="text-white">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var p in savedPassengers)
+                                                    {
+                                                        <tr>
+                                                            <td class="text-light">@p.DisplayName</td>
+                                                            <td class="text-light">@(p.PhoneNumber ?? "—")</td>
+                                                            <td class="text-light">@(p.EmailAddress ?? "—")</td>
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                                                        @onclick="() => EditPassenger(p)">Edit</button>
+                                                                <button class="btn btn-sm btn-outline-danger"
+                                                                        @onclick="() => DeletePassengerAsync(p)"
+                                                                        disabled="@(deletingPassengerId == p.Id)">
+                                                                    @if (deletingPassengerId == p.Id) { <span class="spinner-border spinner-border-sm"></span> }
+                                                                    else { <span>Delete</span> }
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                }
+                                else if (profileTab == "locations")
+                                {
+                                    <!-- Saved Locations tab -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="text-white mb-0">Saved Locations (@savedLocations.Count)</h6>
+                                        <button class="btn btn-sm btn-primary" @onclick="ShowAddLocationForm">
+                                            ➕ Add Location
+                                        </button>
+                                    </div>
+
+                                    @if (showLocationForm)
+                                    {
+                                        <div class="card mb-3" style="border: 1px solid var(--bellwood-gold);">
+                                            <div class="card-body">
+                                                <h6 class="text-white">@(editingLocationId == null ? "New Location" : "Edit Location")</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Label <span class="text-danger">*</span></label>
+                                                        <input class="form-control" @bind="locLabel" placeholder="Home, Office…" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Address <span class="text-danger">*</span></label>
+                                                        <input class="form-control" @bind="locAddress" />
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label text-white">Latitude <span class="text-danger">*</span></label>
+                                                        <input class="form-control" type="number" step="any" @bind="locLat" />
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label text-white">Longitude <span class="text-danger">*</span></label>
+                                                        <input class="form-control" type="number" step="any" @bind="locLng" />
+                                                    </div>
+                                                    <div class="col-md-6 d-flex align-items-end">
+                                                        <div class="form-check ms-1">
+                                                            <input class="form-check-input" type="checkbox" @bind="locIsFavorite" id="locFav" />
+                                                            <label class="form-check-label text-light" for="locFav">⭐ Favorite</label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(locFormError))
+                                                {
+                                                    <div class="alert alert-danger mt-2 py-1">@locFormError</div>
+                                                }
+                                                <div class="mt-3 d-flex gap-2">
+                                                    <button class="btn btn-primary btn-sm" @onclick="SaveLocationAsync" disabled="@isSavingLocation">
+                                                        @if (isSavingLocation) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                                        Save
+                                                    </button>
+                                                    <button class="btn btn-secondary btn-sm" @onclick="CancelLocationForm">Cancel</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    @if (!savedLocations.Any())
+                                    {
+                                        <div class="alert alert-info">No saved locations yet.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="text-white">Label</th>
+                                                        <th class="text-white">Address</th>
+                                                        <th class="text-white">Fav</th>
+                                                        <th class="text-white">Uses</th>
+                                                        <th class="text-white">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var loc in savedLocations)
+                                                    {
+                                                        <tr>
+                                                            <td class="text-light">@loc.Label</td>
+                                                            <td class="text-light"><small>@loc.Address</small></td>
+                                                            <td class="text-center">@(loc.IsFavorite ? "⭐" : "")</td>
+                                                            <td class="text-light text-center">@loc.UseCount</td>
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-secondary me-1"
+                                                                        @onclick="() => EditLocation(loc)">Edit</button>
+                                                                <button class="btn btn-sm btn-outline-danger"
+                                                                        @onclick="() => DeleteLocationAsync(loc)"
+                                                                        disabled="@(deletingLocationId == loc.Id)">
+                                                                    @if (deletingLocationId == loc.Id) { <span class="spinner-border spinner-border-sm"></span> }
+                                                                    else { <span>Delete</span> }
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CloseProfileModal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </Authorized>
     <NotAuthorized>
@@ -326,9 +574,11 @@
 </AuthorizeView>
 
 @code {
+    // ── Users list ────────────────────────────────────────────────────────────
+
     private List<UserDto> users = new();
     private UserDto? selectedUser;
-    
+
     private bool isLoading = false;
     private bool isUpdatingRoles = false;
     private bool isCreating = false;
@@ -337,17 +587,17 @@
     private string? errorMessage;
     private bool showCreateModal = false;
     private bool showRolesModal = false;
-    private bool disableEndpointAvailable = false; // Start as unavailable for alpha testing
+    private bool disableEndpointAvailable = false;
 
-    // Available roles - AdminAPI accepts case-insensitive, normalizes to lowercase
-    // Valid: "admin", "dispatcher", "driver", "booker"
     private readonly List<string> availableRoles = new() { "booker", "driver", "dispatcher", "admin" };
-    
     private bool IsAdmin => selectedRoles.Contains("admin");
+    private static bool IsBookerUser(UserDto user) =>
+        user.Roles.Any(r => r.Equals("booker", StringComparison.OrdinalIgnoreCase));
 
     private HashSet<string> selectedRoles = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedCreateRoles = new(StringComparer.OrdinalIgnoreCase);
 
+    // Create-user form fields
     private string newUserEmail = string.Empty;
     private string newUserFirstName = string.Empty;
     private string newUserLastName = string.Empty;
@@ -356,6 +606,41 @@
     private string confirmPassword = string.Empty;
 
     private ToastNotification? toast;
+
+    // ── Profile modal state ───────────────────────────────────────────────────
+
+    private UserDto? profileUser;
+    private bool showProfileModal = false;
+    private string profileTab = "passengers";
+    private bool isProfileLoading = false;
+    private string? profileError;
+
+    // Saved passengers
+    private List<SavedPassengerDto> savedPassengers = new();
+    private bool showPassengerForm = false;
+    private string? editingPassengerId;
+    private string paxFirstName = string.Empty;
+    private string paxLastName = string.Empty;
+    private string paxPhone = string.Empty;
+    private string paxEmail = string.Empty;
+    private string? paxFormError;
+    private bool isSavingPassenger = false;
+    private string? deletingPassengerId;
+
+    // Saved locations
+    private List<SavedLocationDto> savedLocations = new();
+    private bool showLocationForm = false;
+    private string? editingLocationId;
+    private string locLabel = string.Empty;
+    private string locAddress = string.Empty;
+    private double locLat;
+    private double locLng;
+    private bool locIsFavorite;
+    private string? locFormError;
+    private bool isSavingLocation = false;
+    private string? deletingLocationId;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,7 +651,7 @@
     {
         isLoading = true;
         errorMessage = null;
-        
+
         try
         {
             users = await UserService.GetUsersAsync();
@@ -375,19 +660,19 @@
         {
             errorMessage = ex.Message;
             toast?.ShowError(ex.Message);
-            Console.WriteLine($"[UserManagement] Access denied: {ex.Message}");
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load users: {ex.Message}";
             toast?.ShowError(errorMessage);
-            Console.WriteLine($"[UserManagement] Error loading users: {ex.Message}");
         }
         finally
         {
             isLoading = false;
         }
     }
+
+    // ── Role change modal ─────────────────────────────────────────────────────
 
     private void ShowRoleChangeModal(UserDto user)
     {
@@ -410,7 +695,7 @@
     private async Task ConfirmRoleChange()
     {
         if (selectedUser == null) return;
-        
+
         if (!selectedRoles.Any())
         {
             errorMessage = "Select at least one role before saving.";
@@ -418,7 +703,6 @@
             return;
         }
 
-        // AuthServer uses mutually exclusive roles - user can only have ONE role
         if (selectedRoles.Count > 1)
         {
             errorMessage = "Users can only have one role. Please select only one.";
@@ -433,20 +717,13 @@
         try
         {
             var newRole = selectedRoles.First();
-            
-            // Use userId (not username) for role updates via AdminAPI
-            // AdminAPI accepts lowercase role names (booker, driver, dispatcher, admin)
             var result = await UserService.UpdateUserRoleAsync(selectedUser.Id, newRole);
 
             if (result.Success)
             {
-                var userIdentifier = !string.IsNullOrEmpty(selectedUser.Username) 
-                    ? selectedUser.Username 
-                    : selectedUser.Email;
-                    
-                successMessage = $"Role updated for {userIdentifier} to {GetRoleLabel(newRole)}.";
+                var id = !string.IsNullOrEmpty(selectedUser.Username) ? selectedUser.Username : selectedUser.Email;
+                successMessage = $"Role updated for {id} to {GetRoleLabel(newRole)}.";
                 toast?.ShowSuccess(successMessage);
-
                 await LoadUsersAsync();
                 CancelRoleChange();
             }
@@ -465,13 +742,14 @@
         {
             errorMessage = $"Failed to update role: {ex.Message}";
             toast?.ShowError(errorMessage);
-            Console.WriteLine($"[UserManagement] Error updating role: {ex.Message}");
         }
         finally
         {
             isUpdatingRoles = false;
         }
     }
+
+    // ── Create user modal ─────────────────────────────────────────────────────
 
     private void ShowCreateModal()
     {
@@ -500,7 +778,6 @@
         errorMessage = null;
         successMessage = null;
 
-        // Capture form values now; CloseCreateModal() will clear the bindings.
         var isBooker = selectedCreateRoles.Contains("booker");
         var email = newUserEmail.Trim();
         var firstName = newUserFirstName.Trim();
@@ -527,7 +804,6 @@
                 return;
             }
 
-            // For booker accounts, persist the phone (and name) on the booker profile.
             if (isBooker && !string.IsNullOrEmpty(result.UserId))
             {
                 var profileResult = await UserService.UpdateBookerProfileAsync(
@@ -536,13 +812,12 @@
                     {
                         FirstName    = firstName,
                         LastName     = lastName,
-                        EmailAddress = email,       // required by Admin API
-                        PhoneNumber  = phone        // was "Phone"; API expects "phoneNumber"
+                        EmailAddress = email,
+                        PhoneNumber  = phone
                     });
 
                 if (!profileResult.Success)
                 {
-                    // User was created; only the profile update failed — warn, don't block.
                     successMessage = $"Booker {email} created. Warning: phone could not be saved — {profileResult.Message}";
                     toast?.ShowSuccess(successMessage);
                 }
@@ -579,12 +854,11 @@
         }
     }
 
+    // ── Disable / enable ──────────────────────────────────────────────────────
+
     private async Task ToggleUserDisabled(UserDto user)
     {
-        if (statusUpdatingUserId != null)
-        {
-            return;
-        }
+        if (statusUpdatingUserId != null) return;
 
         statusUpdatingUserId = user.Id;
         errorMessage = null;
@@ -604,11 +878,8 @@
             if (result.Success)
             {
                 user.IsDisabled = !user.IsDisabled;
-                var userIdentifier = !string.IsNullOrEmpty(user.Username)
-                    ? user.Username
-                    : user.Email;
-                successMessage = $"{userIdentifier} {(user.IsDisabled ? "disabled" : "enabled")}.";
-
+                var id = !string.IsNullOrEmpty(user.Username) ? user.Username : user.Email;
+                successMessage = $"{id} {(user.IsDisabled ? "disabled" : "enabled")}.";
                 toast?.ShowSuccess(successMessage);
             }
             else
@@ -617,52 +888,244 @@
                 toast?.ShowError(errorMessage);
             }
         }
+        catch (UnauthorizedAccessException ex) { errorMessage = ex.Message; toast?.ShowError(ex.Message); }
+        catch (Exception ex) { errorMessage = $"Failed to update user status: {ex.Message}"; toast?.ShowError(errorMessage); }
+        finally { statusUpdatingUserId = null; }
+    }
+
+    // ── Profile modal ─────────────────────────────────────────────────────────
+
+    private async Task ShowProfileModal(UserDto user)
+    {
+        profileUser = user;
+        profileTab = "passengers";
+        profileError = null;
+        showProfileModal = true;
+        ResetPassengerForm();
+        ResetLocationForm();
+        await LoadProfileDataAsync();
+    }
+
+    private void CloseProfileModal()
+    {
+        showProfileModal = false;
+        profileUser = null;
+        savedPassengers.Clear();
+        savedLocations.Clear();
+        ResetPassengerForm();
+        ResetLocationForm();
+    }
+
+    private async Task LoadProfileDataAsync()
+    {
+        if (profileUser == null) return;
+
+        isProfileLoading = true;
+        profileError = null;
+
+        try
+        {
+            var userId = string.IsNullOrEmpty(profileUser.Id) ? null : profileUser.Id;
+
+            // Sequential calls — ValueTask tuple-await is not available without extra packages
+            savedPassengers = await ProfileService.GetSavedPassengersAsync(userId);
+            savedLocations  = await ProfileService.GetSavedLocationsAsync(userId);
+        }
         catch (UnauthorizedAccessException ex)
         {
-            errorMessage = ex.Message;
+            profileError = ex.Message;
             toast?.ShowError(ex.Message);
         }
         catch (Exception ex)
         {
-            errorMessage = $"Failed to update user status: {ex.Message}";
-            toast?.ShowError(errorMessage);
+            profileError = $"Failed to load profile data: {ex.Message}";
+            toast?.ShowError(profileError);
         }
         finally
         {
-            statusUpdatingUserId = null;
+            isProfileLoading = false;
         }
     }
 
-    private void ToggleCreateRole(string role, object? value)
+    // ── Passenger form ────────────────────────────────────────────────────────
+
+    private void ShowAddPassengerForm() { ResetPassengerForm(); showPassengerForm = true; }
+
+    private void EditPassenger(SavedPassengerDto p)
     {
-        ToggleRoleSelection(selectedCreateRoles, role, value);
+        editingPassengerId = p.Id;
+        paxFirstName = p.FirstName;
+        paxLastName  = p.LastName;
+        paxPhone     = p.PhoneNumber ?? string.Empty;
+        paxEmail     = p.EmailAddress ?? string.Empty;
+        paxFormError = null;
+        showPassengerForm = true;
     }
 
-    private void ToggleEditRole(string role, object? value)
+    private void CancelPassengerForm() => ResetPassengerForm();
+
+    private void ResetPassengerForm()
     {
-        ToggleRoleSelection(selectedRoles, role, value);
+        showPassengerForm  = false;
+        editingPassengerId = null;
+        paxFirstName = paxLastName = paxPhone = paxEmail = string.Empty;
+        paxFormError = null;
     }
 
-    private void SelectSingleRole(string role)
+    private async Task SavePassengerAsync()
     {
-        selectedRoles.Clear();
-        selectedRoles.Add(role);
-    }
-
-    private static void ToggleRoleSelection(HashSet<string> selection, string role, object? value)
-    {
-        if (value is not bool isChecked)
+        if (string.IsNullOrWhiteSpace(paxFirstName) || string.IsNullOrWhiteSpace(paxLastName))
         {
+            paxFormError = "First name and last name are required.";
             return;
         }
 
-        if (isChecked)
+        isSavingPassenger = true;
+        paxFormError = null;
+        var userId = profileUser?.Id;
+
+        try
         {
-            selection.Add(role);
+            var req = new SavedPassengerRequest
+            {
+                FirstName    = paxFirstName.Trim(),
+                LastName     = paxLastName.Trim(),
+                PhoneNumber  = string.IsNullOrWhiteSpace(paxPhone) ? null : paxPhone.Trim(),
+                EmailAddress = string.IsNullOrWhiteSpace(paxEmail) ? null : paxEmail.Trim()
+            };
+
+            var result = editingPassengerId == null
+                ? await ProfileService.AddPassengerAsync(req, userId)
+                : await ProfileService.UpdatePassengerAsync(editingPassengerId, req, userId);
+
+            if (result.Success)
+            {
+                toast?.ShowSuccess(editingPassengerId == null ? "Passenger added." : "Passenger updated.");
+                ResetPassengerForm();
+                await LoadProfileDataAsync();
+            }
+            else
+            {
+                paxFormError = result.Message ?? "Failed to save passenger.";
+            }
         }
-        else
+        catch (UnauthorizedAccessException ex) { paxFormError = ex.Message; }
+        catch (Exception ex) { paxFormError = $"Error: {ex.Message}"; }
+        finally { isSavingPassenger = false; }
+    }
+
+    private async Task DeletePassengerAsync(SavedPassengerDto p)
+    {
+        deletingPassengerId = p.Id;
+        try
         {
-            selection.Remove(role);
+            var result = await ProfileService.DeletePassengerAsync(p.Id, profileUser?.Id);
+            if (result.Success) { savedPassengers.Remove(p); toast?.ShowSuccess($"Passenger '{p.DisplayName}' deleted."); }
+            else toast?.ShowError(result.Message ?? "Failed to delete passenger.");
+        }
+        catch (UnauthorizedAccessException ex) { toast?.ShowError(ex.Message); }
+        catch (Exception ex) { toast?.ShowError($"Error: {ex.Message}"); }
+        finally { deletingPassengerId = null; }
+    }
+
+    // ── Location form ─────────────────────────────────────────────────────────
+
+    private void ShowAddLocationForm() { ResetLocationForm(); showLocationForm = true; }
+
+    private void EditLocation(SavedLocationDto loc)
+    {
+        editingLocationId = loc.Id;
+        locLabel      = loc.Label;
+        locAddress    = loc.Address;
+        locLat        = loc.Latitude;
+        locLng        = loc.Longitude;
+        locIsFavorite = loc.IsFavorite;
+        locFormError  = null;
+        showLocationForm = true;
+    }
+
+    private void CancelLocationForm() => ResetLocationForm();
+
+    private void ResetLocationForm()
+    {
+        showLocationForm  = false;
+        editingLocationId = null;
+        locLabel   = locAddress = string.Empty;
+        locLat     = locLng = 0;
+        locIsFavorite = false;
+        locFormError  = null;
+    }
+
+    private async Task SaveLocationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(locLabel) || string.IsNullOrWhiteSpace(locAddress))
+        {
+            locFormError = "Label and address are required.";
+            return;
+        }
+
+        isSavingLocation = true;
+        locFormError = null;
+        var userId = profileUser?.Id;
+
+        try
+        {
+            var req = new SavedLocationRequest
+            {
+                Label      = locLabel.Trim(),
+                Address    = locAddress.Trim(),
+                Latitude   = locLat,
+                Longitude  = locLng,
+                IsFavorite = locIsFavorite
+            };
+
+            var result = editingLocationId == null
+                ? await ProfileService.AddLocationAsync(req, userId)
+                : await ProfileService.UpdateLocationAsync(editingLocationId, req, userId);
+
+            if (result.Success)
+            {
+                toast?.ShowSuccess(editingLocationId == null ? "Location added." : "Location updated.");
+                ResetLocationForm();
+                await LoadProfileDataAsync();
+            }
+            else
+            {
+                locFormError = result.Message ?? "Failed to save location.";
+            }
+        }
+        catch (UnauthorizedAccessException ex) { locFormError = ex.Message; }
+        catch (Exception ex) { locFormError = $"Error: {ex.Message}"; }
+        finally { isSavingLocation = false; }
+    }
+
+    private async Task DeleteLocationAsync(SavedLocationDto loc)
+    {
+        deletingLocationId = loc.Id;
+        try
+        {
+            var result = await ProfileService.DeleteLocationAsync(loc.Id, profileUser?.Id);
+            if (result.Success) { savedLocations.Remove(loc); toast?.ShowSuccess($"Location '{loc.Label}' deleted."); }
+            else toast?.ShowError(result.Message ?? "Failed to delete location.");
+        }
+        catch (UnauthorizedAccessException ex) { toast?.ShowError(ex.Message); }
+        catch (Exception ex) { toast?.ShowError($"Error: {ex.Message}"); }
+        finally { deletingLocationId = null; }
+    }
+
+    // ── Shared helpers ────────────────────────────────────────────────────────
+
+    private void ToggleCreateRole(string role, object? value) => ToggleRoleSelection(selectedCreateRoles, role, value);
+    private void ToggleEditRole(string role, object? value)   => ToggleRoleSelection(selectedRoles, role, value);
+
+    private void SelectSingleRole(string role) { selectedRoles.Clear(); selectedRoles.Add(role); }
+
+    private static void ToggleRoleSelection(HashSet<string> selection, string role, object? value)
+    {
+        if (value is bool isChecked)
+        {
+            if (isChecked) selection.Add(role);
+            else           selection.Remove(role);
         }
     }
 
@@ -670,93 +1133,53 @@
     {
         if (string.IsNullOrWhiteSpace(newUserEmail))
             return "Email is required.";
-
         if (!selectedCreateRoles.Any())
             return "Select at least one role.";
-
         if (selectedCreateRoles.Contains("booker"))
         {
-            if (string.IsNullOrWhiteSpace(newUserFirstName))
-                return "First name is required for booker accounts.";
-            if (string.IsNullOrWhiteSpace(newUserLastName))
-                return "Last name is required for booker accounts.";
-            if (string.IsNullOrWhiteSpace(newUserPhone))
-                return "Phone number is required for booker accounts.";
+            if (string.IsNullOrWhiteSpace(newUserFirstName)) return "First name is required for booker accounts.";
+            if (string.IsNullOrWhiteSpace(newUserLastName))  return "Last name is required for booker accounts.";
+            if (string.IsNullOrWhiteSpace(newUserPhone))     return "Phone number is required for booker accounts.";
         }
-
         if (string.IsNullOrWhiteSpace(temporaryPassword) || temporaryPassword.Length < 10)
             return "Temporary password must be at least 10 characters.";
-
         if (!string.Equals(temporaryPassword, confirmPassword, StringComparison.Ordinal))
             return "Temporary password and confirmation do not match.";
-
         return null;
     }
 
     private void ClearCreateForm()
     {
-        newUserEmail = string.Empty;
-        newUserFirstName = string.Empty;
-        newUserLastName = string.Empty;
-        newUserPhone = string.Empty;
-        temporaryPassword = string.Empty;
-        confirmPassword = string.Empty;
+        newUserEmail = newUserFirstName = newUserLastName = newUserPhone =
+            temporaryPassword = confirmPassword = string.Empty;
         selectedCreateRoles.Clear();
     }
 
-    private string NormalizeRoleSelection(string role)
+    private string NormalizeRoleSelection(string role) =>
+        availableRoles.FirstOrDefault(r => r.Equals(role, StringComparison.OrdinalIgnoreCase)) ?? role;
+
+    private static string GetRoleLabel(string role) => role.ToLowerInvariant() switch
     {
-        var normalized = availableRoles.FirstOrDefault(r => r.Equals(role, StringComparison.OrdinalIgnoreCase));
-        return normalized ?? role;
+        "admin"      => "Admin",
+        "dispatcher" => "Dispatcher",
+        "driver"     => "Driver",
+        "booker"     => "Booker",
+        _            => role
+    };
+
+    private static string FormatDateTime(DateTime? dt)
+    {
+        if (!dt.HasValue || dt.Value == DateTime.MinValue || dt.Value.Year == 1) return "—";
+        return dt.Value.ToLocalTime().ToString("g");
     }
 
-    private static string GetRoleLabel(string role)
-    {
-        return role.ToLowerInvariant() switch
-        {
-            "admin" => "Admin",
-            "dispatcher" => "Dispatcher",
-            "driver" => "Driver",
-            "booker" => "Booker",
-            _ => role
-        };
-    }
-    
-    private static string FormatDateTime(DateTime? dateTime)
-    {
-        if (!dateTime.HasValue)
-            return "—";
-            
-        // Check if it's a placeholder/default value
-        if (dateTime.Value == DateTime.MinValue || dateTime.Value.Year == 1)
-            return "—";
-            
-        return dateTime.Value.ToLocalTime().ToString("g");
-    }
-
-    private static string FormatRole(UserDto user)
-    {
-        if (string.IsNullOrEmpty(user.Role))
-        {
-            return "None";
-        }
-
-        return GetRoleLabel(user.Role);
-    }
+    private static string FormatRole(UserDto user) =>
+        string.IsNullOrEmpty(user.Role) ? "None" : GetRoleLabel(user.Role);
 
     private static string FormatRoles(UserDto user)
     {
-        // Backward compatibility - use Role if available, fall back to Roles list
-        if (!string.IsNullOrEmpty(user.Role))
-        {
-            return GetRoleLabel(user.Role);
-        }
-        
-        if (user.Roles == null || user.Roles.Count == 0)
-        {
-            return "None";
-        }
-
+        if (!string.IsNullOrEmpty(user.Role)) return GetRoleLabel(user.Role);
+        if (user.Roles == null || user.Roles.Count == 0) return "None";
         return string.Join(", ", user.Roles.Select(GetRoleLabel));
     }
 }
