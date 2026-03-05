@@ -389,19 +389,19 @@
                                                 <div class="row g-2">
                                                     <div class="col-md-6">
                                                         <label class="form-label text-white">First Name <span class="text-danger">*</span></label>
-                                                        <input type="text" class="form-control" @bind="paxFirstName" />
+                                                        <input type="text" class="form-control" @bind="paxFirstName" @bind:event="oninput" />
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label class="form-label text-white">Last Name <span class="text-danger">*</span></label>
-                                                        <input type="text" class="form-control" @bind="paxLastName" />
+                                                        <input type="text" class="form-control" @bind="paxLastName" @bind:event="oninput" />
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label class="form-label text-white">Phone</label>
-                                                        <input type="tel" class="form-control" @bind="paxPhone" placeholder="(555) 000-0000" />
+                                                        <input type="tel" class="form-control" @bind="paxPhone" @bind:event="oninput" placeholder="(555) 000-0000" />
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label class="form-label text-white">Email</label>
-                                                        <input type="email" class="form-control" @bind="paxEmail" />
+                                                        <input type="email" class="form-control" @bind="paxEmail" @bind:event="oninput" />
                                                     </div>
                                                 </div>
                                                 @if (!string.IsNullOrEmpty(paxFormError))
