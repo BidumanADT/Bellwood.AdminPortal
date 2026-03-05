@@ -272,7 +272,7 @@ public partial class QuoteDetail
         builder.OpenElement(index++, "strong");
         builder.AddContent(index++, "Passengers:");
         builder.CloseElement();
-        builder.AddContent(index++, $" {quote?.PassengerCount}");
+        builder.AddContent(index++, $" {quote?.EffectivePassengerCount}");
         builder.CloseElement();
         
         builder.OpenElement(index++, "div");
@@ -280,7 +280,7 @@ public partial class QuoteDetail
         builder.OpenElement(index++, "strong");
         builder.AddContent(index++, "Luggage:");
         builder.CloseElement();
-        builder.AddContent(index++, $" {quote?.Luggage} pieces");
+        builder.AddContent(index++, $" {quote?.EffectiveLuggage} pieces");
         builder.CloseElement();
         
         builder.OpenElement(index++, "div");

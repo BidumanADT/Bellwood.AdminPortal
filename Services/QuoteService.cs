@@ -58,6 +58,9 @@ public class QuoteService : IQuoteService
         return client;
     }
 
+    private static readonly System.Text.Json.JsonSerializerOptions _jsonOpts =
+        new() { PropertyNameCaseInsensitive = true };
+
     public async Task<List<QuoteDetailDto>> GetQuotesAsync(int take = 100)
     {
         var client = await GetAuthorizedClientAsync();
@@ -76,7 +79,7 @@ public class QuoteService : IQuoteService
             throw new Exception($"Failed to get quotes: {response.StatusCode}. {errorContent}");
         }
         
-        return await response.Content.ReadFromJsonAsync<List<QuoteDetailDto>>() ?? new();
+        return await response.Content.ReadFromJsonAsync<List<QuoteDetailDto>>(_jsonOpts) ?? new();
     }
 
     public async Task<QuoteDetailDto?> GetQuoteAsync(string id)
@@ -99,7 +102,7 @@ public class QuoteService : IQuoteService
             throw new Exception($"Failed to get quote: {response.StatusCode}. {errorContent}");
         }
         
-        return await response.Content.ReadFromJsonAsync<QuoteDetailDto>();
+        return await response.Content.ReadFromJsonAsync<QuoteDetailDto>(_jsonOpts);
     }
 
     public async Task UpdateQuoteAsync(string id, UpdateQuoteDto updateDto)
