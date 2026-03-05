@@ -1,6 +1,22 @@
 namespace Bellwood.AdminPortal.Models;
 
 /// <summary>
+/// Nested draft object returned inside GET /quotes/{id}.
+/// The API stores passenger count and luggage breakdown here, not at the top level.
+/// </summary>
+public class QuoteDraftDto
+{
+    [System.Text.Json.Serialization.JsonPropertyName("passengerCount")]
+    public int PassengerCount { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("checkedBags")]
+    public int CheckedBags { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("carryOnBags")]
+    public int CarryOnBags { get; set; }
+}
+
+/// <summary>
 /// Detailed quote information for viewing and editing
 /// </summary>
 public class QuoteDetailDto
@@ -92,6 +108,29 @@ public class QuoteDetailDto
     /// Null if quote not yet accepted or was rejected/cancelled.
     /// </summary>
     public string? BookingId { get; set; }
+
+    /// <summary>
+    /// Nested draft object from the API — contains passenger count and luggage breakdown.
+    /// Always present on GET /quotes/{id}; null on list endpoint.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("draft")]
+    public QuoteDraftDto? Draft { get; set; }
+
+    // ?? Computed helpers so existing RenderTripDetails code needs no changes ??
+
+    /// <summary>
+    /// Total passenger count — read from draft when available, falls back to own field.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EffectivePassengerCount => Draft?.PassengerCount ?? PassengerCount;
+
+    /// <summary>
+    /// Total luggage pieces (checked + carry-on) for display in Trip Details.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EffectiveLuggage => Draft != null
+        ? Draft.CheckedBags + Draft.CarryOnBags
+        : Luggage;
 }
 
 /// <summary>
