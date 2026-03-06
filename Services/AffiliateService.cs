@@ -1,6 +1,7 @@
 using Bellwood.AdminPortal.Models;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Bellwood.AdminPortal.Services;
 
@@ -21,6 +22,9 @@ public class AffiliateService : IAffiliateService
     private readonly IAuthTokenProvider _tokenProvider;
     private readonly IAdminApiKeyProvider _apiKeyProvider;
     private readonly ILogger<AffiliateService> _logger;
+
+    private static readonly JsonSerializerOptions _jsonOpts =
+        new() { PropertyNameCaseInsensitive = true };
 
     public AffiliateService(
         IHttpClientFactory httpFactory,
@@ -115,10 +119,14 @@ public class AffiliateService : IAffiliateService
             throw new UnauthorizedAccessException("Access denied. You do not have permission to create affiliates.");
         }
         
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed to create affiliate: {response.StatusCode}. {errorContent}");
+        }
         
-        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-        return result?["id"] ?? throw new Exception("No ID returned from create");
+        var created = await response.Content.ReadFromJsonAsync<AffiliateDto>(_jsonOpts);
+        return created?.Id ?? throw new Exception("No ID returned from affiliate creation.");
     }
 
     public async Task UpdateAffiliateAsync(string id, AffiliateDto affiliate)
@@ -181,7 +189,7 @@ public class AffiliateService : IAffiliateService
         // Phase 2.5: Handle 403 Forbidden
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
-            _logger.LogWarning($"[AffiliateService] Access denied to add driver to affiliate {affiliateId}");
+            _logger.LogWarning("[AffiliateService] Access denied to add driver to affiliate {AffiliateId}", affiliateId);
             throw new UnauthorizedAccessException("Access denied. You do not have permission to add drivers.");
         }
         
@@ -191,8 +199,8 @@ public class AffiliateService : IAffiliateService
             throw new Exception($"Failed to add driver: {response.StatusCode}. {errorContent}");
         }
         
-        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-        return result?["id"] ?? throw new Exception("No ID returned from driver creation");
+        var created = await response.Content.ReadFromJsonAsync<DriverDto>(_jsonOpts);
+        return created?.Id ?? throw new Exception("No ID returned from driver creation.");
     }
 
     public async Task AssignDriverToBookingAsync(string bookingId, string driverId)
