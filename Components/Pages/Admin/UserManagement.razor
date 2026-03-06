@@ -7,6 +7,7 @@
 @using Bellwood.AdminPortal.Components.Shared
 @inject IUserManagementService UserService
 @inject IProfileApiService ProfileService
+@inject IAffiliateService AffiliateService
 @inject NavigationManager Navigation
 
 <PageTitle>User Management - Bellwood Elite</PageTitle>
@@ -564,6 +565,124 @@
                     </div>
                 </div>
             }
+
+            <!-- ── Driver Setup Modal (post-create affiliate + driver linking) ── -->
+            @if (showDriverSetupModal && !string.IsNullOrEmpty(driverSetupUserId))
+            {
+                <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content" style="background: var(--bellwood-charcoal); border: 1px solid var(--bellwood-gold);">
+                            <div class="modal-header">
+                                <h5 class="modal-title text-white">🚗 Driver Setup — Assign to Affiliate</h5>
+                                <button type="button" class="btn-close btn-close-white" @onclick="CancelDriverSetup"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-info py-2">
+                                    <strong>ℹ️</strong> The driver account has been created. Now assign this driver to an affiliate company so they can receive ride assignments.
+                                </div>
+
+                                @if (isLoadingAffiliates)
+                                {
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-bellwood-gold"></div>
+                                        <span class="ms-2 text-muted">Loading affiliates…</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <!-- Affiliate selection -->
+                                    <div class="mb-3">
+                                        <label class="form-label text-white">Affiliate Company <span class="text-danger">*</span></label>
+                                        @if (driverSetupAffiliates.Any())
+                                        {
+                                            <select class="form-select" @bind="driverSetupSelectedAffiliateId">
+                                                <option value="">— Select an affiliate —</option>
+                                                @foreach (var aff in driverSetupAffiliates)
+                                                {
+                                                    <option value="@aff.Id">@aff.Name</option>
+                                                }
+                                                <option value="__new__">➕ Create new affiliate…</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <div class="alert alert-warning py-2 mb-2">No affiliates exist yet. Create one below.</div>
+                                        }
+                                    </div>
+
+                                    <!-- Inline new affiliate form -->
+                                    @if (driverSetupSelectedAffiliateId == "__new__")
+                                    {
+                                        <div class="card mb-3" style="border: 1px solid var(--bellwood-gold);">
+                                            <div class="card-body">
+                                                <h6 class="text-white">New Affiliate</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Company Name <span class="text-danger">*</span></label>
+                                                        <input class="form-control" @bind="newAffName" @bind:event="oninput" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Email <span class="text-danger">*</span></label>
+                                                        <input type="email" class="form-control" @bind="newAffEmail" @bind:event="oninput" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Phone <span class="text-danger">*</span></label>
+                                                        <input type="tel" class="form-control" @bind="newAffPhone" @bind:event="oninput" />
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label text-white">Point of Contact</label>
+                                                        <input class="form-control" @bind="newAffContact" @bind:event="oninput" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <hr class="my-3" />
+
+                                    <!-- Driver details -->
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label text-white">Driver Name <span class="text-danger">*</span></label>
+                                            <input class="form-control" @bind="driverSetupName" @bind:event="oninput" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label text-white">Driver Phone <span class="text-danger">*</span></label>
+                                            <input type="tel" class="form-control" @bind="driverSetupPhone" @bind:event="oninput"
+                                                   placeholder="(555) 000-0000" />
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3 p-2 rounded" style="background: rgba(203, 161, 53, 0.1);">
+                                        <small class="text-muted">
+                                            <strong>Auth ID:</strong> <code class="text-light">@driverSetupUserId</code>
+                                            <br />This links the driver profile to their login account automatically. No manual entry needed.
+                                        </small>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(driverSetupError))
+                                    {
+                                        <div class="alert alert-danger py-2">@driverSetupError</div>
+                                    }
+                                }
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @onclick="CancelDriverSetup">
+                                    Skip for Now
+                                </button>
+                                <button type="button" class="btn btn-primary" @onclick="ConfirmDriverSetupAsync"
+                                        disabled="@(isSavingDriverSetup || isLoadingAffiliates)">
+                                    @if (isSavingDriverSetup)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    Save Driver & Assign
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </Authorized>
     <NotAuthorized>
@@ -639,6 +758,25 @@
     private string? locFormError;
     private bool isSavingLocation = false;
     private string? deletingLocationId;
+
+    // ── Driver setup modal state (post-create workflow) ───────────────────────
+
+    private bool showDriverSetupModal = false;
+    private string? driverSetupUserId;
+    private string driverSetupEmail = string.Empty;
+    private List<AffiliateDto> driverSetupAffiliates = new();
+    private string driverSetupSelectedAffiliateId = string.Empty;
+    private string driverSetupName = string.Empty;
+    private string driverSetupPhone = string.Empty;
+    private bool isLoadingAffiliates = false;
+    private bool isSavingDriverSetup = false;
+    private string? driverSetupError;
+
+    // Inline new-affiliate fields
+    private string newAffName = string.Empty;
+    private string newAffEmail = string.Empty;
+    private string newAffPhone = string.Empty;
+    private string newAffContact = string.Empty;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -779,6 +917,7 @@
         successMessage = null;
 
         var isBooker = selectedCreateRoles.Contains("booker");
+        var isDriver = selectedCreateRoles.Contains("driver");
         var email = newUserEmail.Trim();
         var firstName = newUserFirstName.Trim();
         var lastName = newUserLastName.Trim();
@@ -826,6 +965,14 @@
                     successMessage = $"Booker {email} created successfully.";
                     toast?.ShowSuccess(successMessage);
                 }
+            }
+            else if (isDriver && !string.IsNullOrEmpty(result.UserId))
+            {
+                // Close the create modal first, then open Driver Setup
+                CloseCreateModal();
+                await LoadUsersAsync();
+                await OpenDriverSetupModal(result.UserId, email, firstName, lastName, phone);
+                return; // Don't close/reload again below
             }
             else
             {
@@ -1111,6 +1258,144 @@
         catch (UnauthorizedAccessException ex) { toast?.ShowError(ex.Message); }
         catch (Exception ex) { toast?.ShowError($"Error: {ex.Message}"); }
         finally { deletingLocationId = null; }
+    }
+
+    // ── Driver Setup modal ────────────────────────────────────────────────────
+
+    private async Task OpenDriverSetupModal(string userId, string email, string firstName, string lastName, string phone)
+    {
+        driverSetupUserId = userId;
+        driverSetupEmail = email;
+        // Pre-fill driver name from create form if available
+        driverSetupName = string.IsNullOrWhiteSpace(firstName) && string.IsNullOrWhiteSpace(lastName)
+            ? string.Empty
+            : $"{firstName} {lastName}".Trim();
+        driverSetupPhone = phone;
+        driverSetupSelectedAffiliateId = string.Empty;
+        driverSetupError = null;
+        ResetNewAffiliateFields();
+
+        showDriverSetupModal = true;
+        isLoadingAffiliates = true;
+
+        try
+        {
+            driverSetupAffiliates = await AffiliateService.GetAffiliatesAsync();
+
+            // Auto-select "create new" if no affiliates exist
+            if (!driverSetupAffiliates.Any())
+                driverSetupSelectedAffiliateId = "__new__";
+        }
+        catch (Exception ex)
+        {
+            driverSetupError = $"Failed to load affiliates: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingAffiliates = false;
+        }
+    }
+
+    private void CancelDriverSetup()
+    {
+        showDriverSetupModal = false;
+        driverSetupUserId = null;
+        driverSetupAffiliates.Clear();
+        ResetNewAffiliateFields();
+        toast?.ShowWarning("Driver account created but not assigned to an affiliate yet.");
+    }
+
+    private async Task ConfirmDriverSetupAsync()
+    {
+        driverSetupError = null;
+
+        // Validate driver fields
+        if (string.IsNullOrWhiteSpace(driverSetupName))
+        {
+            driverSetupError = "Driver name is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(driverSetupPhone))
+        {
+            driverSetupError = "Driver phone is required.";
+            return;
+        }
+
+        var affiliateId = driverSetupSelectedAffiliateId;
+
+        // If creating a new affiliate inline, do that first
+        if (affiliateId == "__new__")
+        {
+            if (string.IsNullOrWhiteSpace(newAffName))
+            {
+                driverSetupError = "Affiliate company name is required.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(newAffEmail))
+            {
+                driverSetupError = "Affiliate email is required.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(newAffPhone))
+            {
+                driverSetupError = "Affiliate phone is required.";
+                return;
+            }
+
+            isSavingDriverSetup = true;
+            try
+            {
+                affiliateId = await AffiliateService.CreateAffiliateAsync(new AffiliateDto
+                {
+                    Name           = newAffName.Trim(),
+                    Email          = newAffEmail.Trim(),
+                    Phone          = newAffPhone.Trim(),
+                    PointOfContact = string.IsNullOrWhiteSpace(newAffContact) ? null : newAffContact.Trim()
+                });
+            }
+            catch (Exception ex)
+            {
+                driverSetupError = $"Failed to create affiliate: {ex.Message}";
+                isSavingDriverSetup = false;
+                return;
+            }
+        }
+        else if (string.IsNullOrEmpty(affiliateId))
+        {
+            driverSetupError = "Please select an affiliate or create a new one.";
+            return;
+        }
+
+        // Create the driver profile linked to the AuthServer identity
+        isSavingDriverSetup = true;
+        try
+        {
+            await AffiliateService.AddDriverToAffiliateAsync(affiliateId, new DriverDto
+            {
+                Name    = driverSetupName.Trim(),
+                Phone   = driverSetupPhone.Trim(),
+                UserUid = driverSetupUserId!
+            });
+
+            toast?.ShowSuccess("Driver created and assigned to affiliate.");
+            showDriverSetupModal = false;
+            driverSetupUserId = null;
+            driverSetupAffiliates.Clear();
+            ResetNewAffiliateFields();
+        }
+        catch (Exception ex)
+        {
+            driverSetupError = $"Failed to create driver profile: {ex.Message}";
+        }
+        finally
+        {
+            isSavingDriverSetup = false;
+        }
+    }
+
+    private void ResetNewAffiliateFields()
+    {
+        newAffName = newAffEmail = newAffPhone = newAffContact = string.Empty;
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────

@@ -11,15 +11,15 @@ A production-ready dispatch and operations portal for the Bellwood Global chauff
 
 Bellwood AdminPortal is the **command center** for dispatchers and administrators, enabling:
 
-- ?? **Complete Booking Operations** – View, filter, assign drivers, and manage entire booking lifecycle
-- ??? **Real-Time GPS Tracking** – Live driver location via SignalR WebSockets with Google Maps integration
-- ?? **Affiliate & Driver Management** – Multi-company fleet coordination with driver assignment
-- ?? **Status Monitoring** – Real-time ride status updates (OnRoute, Arrived, PassengerOnboard)
-- ??? **Live Map Dashboard** – Interactive tracking map with driver markers and route visualization
-- ?? **Timezone Support** – Automatic timezone-aware pickup times for worldwide operations
-- ?? **Quote Management** – Complete quote pricing workflow with status updates and customer notifications
-- ?? **Secure Authentication** – JWT-based login with role-based authorization
-- ?? **Responsive Design** – Premium Bellwood Elite branding with dark theme support
+- ?? **Complete Booking Operations** ï¿½ View, filter, assign drivers, and manage entire booking lifecycle
+- ??? **Real-Time GPS Tracking** ï¿½ Live driver location via SignalR WebSockets with Google Maps integration
+- ?? **Affiliate & Driver Management** ï¿½ Multi-company fleet coordination with driver assignment
+- ?? **Status Monitoring** ï¿½ Real-time ride status updates (OnRoute, Arrived, PassengerOnboard)
+- ??? **Live Map Dashboard** ï¿½ Interactive tracking map with driver markers and route visualization
+- ?? **Timezone Support** ï¿½ Automatic timezone-aware pickup times for worldwide operations
+- ?? **Quote Management** ï¿½ Complete quote pricing workflow with status updates and customer notifications
+- ?? **Secure Authentication** ï¿½ JWT-based login with role-based authorization
+- ?? **Responsive Design** ï¿½ Premium Bellwood Elite branding with dark theme support
 
 ## Architecture
 
@@ -262,12 +262,12 @@ curl -X POST https://localhost:5206/affiliates/seed -k
 **Access**: Any authenticated user
 
 **Filters:**
-- **All** – Show all bookings
-- **Requested** – Pending admin approval
-- **Confirmed** – Approved, awaiting driver assignment
-- **Active** – Rides with active GPS tracking (OnRoute, Arrived, PassengerOnboard)
-- **Completed** – Finished rides
-- **Cancelled** – Cancelled bookings
+- **All** ï¿½ Show all bookings
+- **Requested** ï¿½ Pending admin approval
+- **Confirmed** ï¿½ Approved, awaiting driver assignment
+- **Active** ï¿½ Rides with active GPS tracking (OnRoute, Arrived, PassengerOnboard)
+- **Completed** ï¿½ Finished rides
+- **Cancelled** ï¿½ Cancelled bookings
 
 **Search**: Passenger name, booker name, pickup location, dropoff location
 
@@ -338,12 +338,12 @@ curl -X POST https://localhost:5206/affiliates/seed -k
 **Access**: Any authenticated user
 
 **Filters:**
-- **All** – Show all quote requests
-- **Submitted** – New quotes awaiting review
-- **InReview** – Quotes being processed by admin
-- **Priced** – Quotes with pricing ready for customer
-- **Rejected** – Declined quote requests
-- **Closed** – Completed/archived quotes
+- **All** ï¿½ Show all quote requests
+- **Submitted** ï¿½ New quotes awaiting review
+- **InReview** ï¿½ Quotes being processed by admin
+- **Priced** ï¿½ Quotes with pricing ready for customer
+- **Rejected** ï¿½ Declined quote requests
+- **Closed** ï¿½ Completed/archived quotes
 
 **Search**: Passenger name, booker name, pickup location, dropoff location
 
@@ -367,11 +367,11 @@ curl -X POST https://localhost:5206/affiliates/seed -k
 **Access**: Any authenticated user
 
 **Status Workflow:**
-1. **Submitted** – Initial state when quote request arrives
-2. **InReview** – Admin is processing the quote
-3. **Priced** – Price set and customer can view (triggers notification)
-4. **Rejected** – Quote declined by admin
-5. **Closed** – Quote completed/archived
+1. **Submitted** ï¿½ Initial state when quote request arrives
+2. **InReview** ï¿½ Admin is processing the quote
+3. **Priced** ï¿½ Price set and customer can view (triggers notification)
+4. **Rejected** ï¿½ Quote declined by admin
+5. **Closed** ï¿½ Quote completed/archived
 
 **Admin Actions:**
 - Set quoted price (decimal with $0.01 precision)
@@ -429,7 +429,7 @@ curl -X POST https://localhost:5206/affiliates/seed -k
    - BookingDetail page (if viewing that ride)
    - LiveTracking map (updates marker position)
    ?
-6. UI refreshes via StateHasChanged() – no manual refresh needed
+6. UI refreshes via StateHasChanged() ï¿½ no manual refresh needed
 ```
 
 ### SignalR Events Received
@@ -483,8 +483,8 @@ curl -X POST https://localhost:5206/affiliates/seed -k
 - **Event Cleanup**: Proper `IAsyncDisposable` implementation for component lifecycle
 
 **Connection States:**
-- **Connected** (green badge) – SignalR active, real-time updates
-- **Disconnected** (red badge) – Polling mode, 15-second refresh
+- **Connected** (green badge) ï¿½ SignalR active, real-time updates
+- **Disconnected** (red badge) ï¿½ Polling mode, 15-second refresh
 
 ## AdminAPI Integration
 
@@ -530,10 +530,10 @@ The AdminPortal consumes the following AdminAPI endpoints:
 - `admin` group (for all users with admin/dispatcher role)
 
 **Manual Subscriptions:**
-- `SubscribeToRide(rideId)` – Get updates for specific ride
-- `SubscribeToDriver(driverUid)` – Track specific driver
-- `UnsubscribeFromRide(rideId)` – Stop ride updates
-- `UnsubscribeFromDriver(driverUid)` – Stop driver updates
+- `SubscribeToRide(rideId)` ï¿½ Get updates for specific ride
+- `SubscribeToDriver(driverUid)` ï¿½ Track specific driver
+- `UnsubscribeFromRide(rideId)` ï¿½ Stop ride updates
+- `UnsubscribeFromDriver(driverUid)` ï¿½ Stop driver updates
 
 ## Configuration
 
@@ -645,18 +645,18 @@ string displayStatus = booking.CurrentRideStatus ?? booking.Status ?? "Unknown";
 ### Status Badge Styling
 
 **Driver Statuses** (`CurrentRideStatus`):
-- **OnRoute** – Blue (`bg-info`)
-- **Arrived** – Yellow (`bg-warning text-dark`)
-- **PassengerOnboard** – Green (`bg-success`)
+- **OnRoute** ï¿½ Blue (`bg-info`)
+- **Arrived** ï¿½ Yellow (`bg-warning text-dark`)
+- **PassengerOnboard** ï¿½ Green (`bg-success`)
 
 **Booking Statuses** (`Status`):
-- **Requested** – Warning (`bg-warning`)
-- **Confirmed** – Success (`bg-success`)
-- **Scheduled** – Info (`bg-info`)
-- **InProgress** – Primary (`bg-primary`)
-- **Completed** – Success (`bg-success`)
-- **Cancelled** – Danger (`bg-danger`)
-- **NoShow** – Secondary (`bg-secondary`)
+- **Requested** ï¿½ Warning (`bg-warning`)
+- **Confirmed** ï¿½ Success (`bg-success`)
+- **Scheduled** ï¿½ Info (`bg-info`)
+- **InProgress** ï¿½ Primary (`bg-primary`)
+- **Completed** ï¿½ Success (`bg-success`)
+- **Cancelled** ï¿½ Danger (`bg-danger`)
+- **NoShow** ï¿½ Secondary (`bg-secondary`)
 
 ## Timezone Support
 
@@ -914,8 +914,8 @@ public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected
 ```
 
 **UI Indicators**:
-- **Green badge** – SignalR connected
-- **Red badge** – Polling fallback active
+- **Green badge** ï¿½ SignalR connected
+- **Red badge** ï¿½ Polling fallback active
 
 ### Performance Metrics
 
@@ -948,9 +948,9 @@ public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected
 
 ## Branches
 
-- **main** – Stable production code
-- **feature/driver-tracking-prep** – Driver tracking development (merged)
-- **develop** – Integration branch for features
+- **main** ï¿½ Stable production code
+- **feature/driver-tracking-prep** ï¿½ Driver tracking development (merged)
+- **develop** ï¿½ Integration branch for features
 
 ## Security & Standards
 
@@ -985,8 +985,46 @@ For issues or questions:
 ? **Complete Documentation** with deployment guides and troubleshooting  
 ? **Production-Ready** with proper error handling, logging, and security  
 
+## Docker (ECS Fargate)
+
+Build from the **parent directory** (required because of the ProjectReference to `BellwoodGlobal.Core`):
+
+```bash
+cd source/repos   # parent of Bellwood.AdminPortal and BellwoodMobileApp
+docker build -f Bellwood.AdminPortal/Dockerfile -t bellwood-adminportal .
+
+# Tag & push to ECR
+aws ecr get-login-password --region REGION | docker login --username AWS --password-stdin ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com
+docker tag bellwood-adminportal:latest ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/bellwood-adminportal:latest
+docker push ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/bellwood-adminportal:latest
+```
+
+The container listens on port **8080** (`ASPNETCORE_URLS=http://+:8080`).
+
+### ECS Task Definition
+
+Template: `infra/ecs/task-definition.json`
+
+**Placeholders to replace:**
+
+| Placeholder | Description |
+|---|---|
+| `ACCOUNT_ID` | AWS account ID |
+| `REGION` | AWS region (e.g. `us-east-1`) |
+| `EXECUTION_ROLE_NAME` | IAM role for ECS task execution (ECR pull + SSM read) |
+| `TASK_ROLE_NAME` | IAM role for the running task |
+
+**Environment variables for service discovery:**
+
+- `AdminAPI__BaseUrl` - Internal URL of the AdminAPI service
+- `AuthServer__BaseUrl` - Internal URL of the AuthServer service
+
+**SSM parameters required:**
+
+- `/bellwood/alpha/adminportal/jwt-key` - JWT signing key (must match across all services)
+
 ---
 
 **Built with care using Blazor Server + SignalR on .NET 8**
 
-*© 2025 Biduman ADT / Bellwood Global. All rights reserved.*
+*ï¿½ 2025 Biduman ADT / Bellwood Global. All rights reserved.*

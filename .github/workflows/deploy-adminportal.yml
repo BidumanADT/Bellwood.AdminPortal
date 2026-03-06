@@ -23,8 +23,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout AdminPortal
         uses: actions/checkout@v4
+        with:
+          path: Bellwood.AdminPortal
+
+      - name: Checkout BellwoodGlobal.Core (shared dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: BidumanADT/BellwoodMobileApp
+          path: BellwoodMobileApp
+          sparse-checkout: BellwoodGlobal.Mobile/BellwoodGlobal.Core
+          token: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Validate required workflow variables
+        run: |
+          test -n "${AWS_REGION}" || (echo "Missing vars.AWS_REGION" && exit 1)
+          test -n "${ECR_REPOSITORY}" || (echo "Missing vars.ECR_REPOSITORY" && exit 1)
+          test -n "${ECS_CLUSTER}" || (echo "Missing vars.ECS_CLUSTER" && exit 1)
+          test -n "${ECS_SERVICE}" || (echo "Missing vars.ECS_SERVICE" && exit 1)
+          test -n "${ECS_TASK_DEFINITION_PATH}" || (echo "Missing vars.ECS_TASK_DEFINITION_PATH" && exit 1)
+          test -n "${ECS_CONTAINER_NAME}" || (echo "Missing vars.ECS_CONTAINER_NAME" && exit 1)
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,7 +62,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker build -f Dockerfile -t "$IMAGE_URI" .
+          docker build -f Bellwood.AdminPortal/Dockerfile -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
           echo "image=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
@@ -51,7 +70,7 @@ jobs:
         id: render-task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION_PATH }}
+          task-definition: Bellwood.AdminPortal/${{ env.ECS_TASK_DEFINITION_PATH }}
           container-name: ${{ env.ECS_CONTAINER_NAME }}
           image: ${{ steps.build-image.outputs.image }}
 
