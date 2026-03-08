@@ -94,10 +94,9 @@ builder.Services.AddHttpClient("AuthServer", client =>
     "AuthServer"))
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
-    // Accept self-signed certs in non-production environments
-    ServerCertificateCustomValidationCallback = builder.Environment.IsProduction()
-        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator  // replace with null for strict prod
-        : HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    ServerCertificateCustomValidationCallback = builder.Environment.IsDevelopment()
+        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        : null
 });
 
 // AdminAPI HTTP Client (with token attachment)
@@ -113,10 +112,9 @@ builder.Services.AddHttpClient("AdminAPI", client =>
     "AdminAPI"))
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
-    // Accept self-signed certs in non-production environments
-    ServerCertificateCustomValidationCallback = builder.Environment.IsProduction()
-        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator  // replace with null for strict prod
-        : HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    ServerCertificateCustomValidationCallback = builder.Environment.IsDevelopment()
+        ? HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        : null
 });
 
 var app = builder.Build();

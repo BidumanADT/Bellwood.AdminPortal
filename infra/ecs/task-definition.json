@@ -1,15 +1,15 @@
 {
   "family": "bellwood-adminportal",
   "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
+  "requiresCompatibilities": [ "FARGATE" ],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/EXECUTION_ROLE_NAME",
-  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/TASK_ROLE_NAME",
+  "executionRoleArn": "arn:aws:iam::105319843299:role/bellwood-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::105319843299:role/bellwood-adminportal-task-role",
   "containerDefinitions": [
     {
       "name": "bellwood-adminportal",
-      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/bellwood-adminportal:latest",
+      "image": "105319843299.dkr.ecr.us-east-1.amazonaws.com/bellwood-adminportal:latest",
       "essential": true,
       "portMappings": [
         {
@@ -28,33 +28,20 @@
         },
         {
           "name": "AdminAPI__BaseUrl",
-          "value": "http://bellwood-adminapi.internal:8080"
+          "value": "https://api.placeholder.local"
         },
         {
           "name": "AuthServer__BaseUrl",
-          "value": "http://bellwood-authserver.internal:8080"
-        }
-      ],
-      "secrets": [
-        {
-          "name": "Jwt__Key",
-          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/bellwood/alpha/adminportal/jwt-key"
+          "value": "https://auth.placeholder.local"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/bellwood-adminportal",
-          "awslogs-region": "REGION",
+          "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
-      },
-      "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"],
-        "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 15
       }
     }
   ]
