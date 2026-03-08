@@ -31,7 +31,7 @@ jobs:
       - name: Checkout BellwoodGlobal.Core (shared dependency)
         uses: actions/checkout@v4
         with:
-          repository: BidumanADT/BellwoodMobileApp
+          repository: BidumanADT/BellwoodApp
           path: BellwoodMobileApp
           sparse-checkout: BellwoodGlobal.Mobile/BellwoodGlobal.Core
           token: ${{ secrets.CROSS_REPO_TOKEN }}
