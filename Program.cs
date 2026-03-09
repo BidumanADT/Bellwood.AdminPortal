@@ -2,10 +2,17 @@ using Bellwood.AdminPortal.Components;
 using Bellwood.AdminPortal.Observability;
 using Bellwood.AdminPortal.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
 
 // Ensure scoped CSS bundle (Bellwood.AdminPortal.styles.css) is served
 // in non-Development environments. In Development the SDK enables this
@@ -136,6 +143,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseMiddleware<CorrelationLoggingMiddleware>();
 app.UseSerilogRequestLogging();
+
+app.UseForwardedHeaders();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
