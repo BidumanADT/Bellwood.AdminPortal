@@ -27,6 +27,10 @@
           "value": "http://+:8080"
         },
         {
+          "name": "ASPNETCORE_FORWARDEDHEADERS_ENABLED",
+          "value": "true"
+        },
+        {
           "name": "AdminAPI__BaseUrl",
           "value": "https://api.placeholder.local"
         },
