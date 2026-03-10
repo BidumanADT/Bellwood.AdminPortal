@@ -1,0 +1,31 @@
+@inject NavigationManager Navigation
+
+@* 
+    This component replaces inline Navigation.NavigateTo("/login") calls
+    inside <NotAuthorized> blocks.
+
+    Problem solved:
+    During static SSR (prerender), Navigation.NavigateTo produces a 302
+    server-side redirect BEFORE the interactive Blazor circuit connects.
+    This prevents ProtectedSessionStorage from being read, so authenticated
+    users are always bounced to /login.
+
+    Solution:
+    OnAfterRenderAsync only fires after the interactive circuit is live.
+    By that time, JwtAuthenticationStateProvider has had a chance to
+    restore auth state from browser sessionStorage. If the user is actually
+    authenticated, the <AuthorizeView> re-evaluates to <Authorized> and
+    this component is removed from the tree — the redirect never fires.
+    If the user is genuinely anonymous, the redirect fires on the first
+    interactive render.
+*@
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

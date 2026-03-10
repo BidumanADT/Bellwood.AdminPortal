@@ -131,10 +131,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        @{
-            Console.WriteLine("[Quotes] AuthorizeView: NotAuthorized section rendering - redirecting to login");
-            Navigation.NavigateTo("/login");
-        }
+        <RedirectToLogin />
     </NotAuthorized>
 </AuthorizeView>
 

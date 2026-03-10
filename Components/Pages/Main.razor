@@ -118,10 +118,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        @{
-            Console.WriteLine("[Main] User not authorized, redirecting to login");
-            Navigation.NavigateTo("/login");
-        }
+        <RedirectToLogin />
     </NotAuthorized>
 </AuthorizeView>
 
