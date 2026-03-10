@@ -8,34 +8,35 @@ namespace Bellwood.AdminPortal.Services;
 public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly IAuthTokenProvider _tokenProvider;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private ClaimsPrincipal _currentUser = new(new ClaimsIdentity());
 
-    // Whether we have already read from browser storage in the interactive
-    // circuit.  Deliberately NOT a Lazy<Task>: Lazy fires exactly once and
-    // will not retry if the first call happened during prerender (where JS
-    // interop is unavailable).  A plain flag lets the first *interactive*
-    // call perform the read while every subsequent call skips it.
-    private bool _storageRestored = false;
+    // Whether we have successfully read from browser storage in the
+    // interactive circuit.  Never set to true during prerender.
+    private bool _storageRestored;
 
-    public JwtAuthenticationStateProvider(IAuthTokenProvider tokenProvider)
+    public JwtAuthenticationStateProvider(
+        IAuthTokenProvider tokenProvider,
+        IHttpContextAccessor httpContextAccessor)
     {
         _tokenProvider = tokenProvider;
+        _httpContextAccessor = httpContextAccessor;
         Console.WriteLine("[AuthStateProvider] Initialized");
     }
 
+    /// <summary>
+    /// True during static SSR (prerender).  ProtectedSessionStorage must
+    /// not be called in this context — it would deadlock.
+    /// </summary>
+    private bool IsPrerendering => _httpContextAccessor.HttpContext is not null;
+
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        // ProtectedSessionStorage requires an active JS-interop channel.
-        // That channel does not exist during the static prerender pass.
-        // We detect prerender by attempting the storage read and treating
-        // any JSException / InvalidOperationException as "not yet available":
-        // AuthTokenProvider already swallows those and returns null, so the
-        // only thing we need to guard here is not marking _storageRestored=true
-        // on a prerender attempt.
-        //
-        // The safe pattern: only restore once, and only after storage
-        // actually returns a usable result (or definitively returns empty).
-        if (!_storageRestored)
+        // During prerender: return anonymous immediately.  Do not touch
+        // browser storage — there is no JS-interop channel and the call
+        // would deadlock.  The interactive circuit will call us again
+        // with a fresh scoped instance where IsPrerendering == false.
+        if (!_storageRestored && !IsPrerendering)
         {
             await RestoreAuthStateFromStorageAsync();
         }
@@ -50,15 +51,6 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         try
         {
             var token = await _tokenProvider.GetTokenAsync();
-
-            // AuthTokenProvider.GetTokenAsync catches JS interop exceptions
-            // during prerender and returns null.  It also sets _storageReadForAccess=true
-            // internally on that failed attempt, which would prevent a real read later.
-            // We therefore only commit the "restored" flag when we know storage
-            // was actually reachable — i.e. when we got a non-null token OR when
-            // AuthTokenProvider confirms it completed a real (non-prerender) read.
-            // The simplest proxy: if GetTokenAsync returned without throwing, the
-            // storage layer handled it; trust it and mark done.
             _storageRestored = true;
 
             if (string.IsNullOrEmpty(token))
@@ -80,10 +72,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         }
         catch (Exception ex)
         {
-            // Do NOT set _storageRestored = true here.  If something unexpected
-            // throws (e.g. a Data Protection key rotation error), we want the
-            // next GetAuthenticationStateAsync call to try again rather than
-            // permanently caching a failed attempt.
+            // Do NOT set _storageRestored = true.  Retry on next call.
             Console.WriteLine($"[AuthStateProvider] Error restoring auth state: {ex.Message}");
         }
     }
@@ -110,7 +99,6 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         _currentUser = new ClaimsPrincipal(
             new ClaimsIdentity(claims, authenticationType: "jwt"));
 
-        // Storage is definitely available now (called from an interactive event).
         _storageRestored = true;
 
         var role   = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;

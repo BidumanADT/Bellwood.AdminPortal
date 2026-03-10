@@ -17,10 +17,11 @@ namespace Bellwood.AdminPortal.Services;
 ///
 /// Prerender safety:
 /// ProtectedSessionStorage requires an active JS-interop channel that does not
-/// exist during the static prerender pass.  GetAsync throws (or returns a
-/// failure result) during that phase.  We detect this by inspecting whether
-/// the read actually succeeded: if the result is not Success we leave the
-/// "read" flag unset so the first interactive-circuit call retries.
+/// exist during the static SSR prerender pass.  Calling it during prerender
+/// can deadlock (the await hangs waiting for a circuit that doesn't exist).
+/// We detect prerender by checking IHttpContextAccessor: during static SSR
+/// there is an active HttpContext; during an interactive circuit there is not.
+/// When HttpContext is present we skip all storage calls entirely.
 /// </summary>
 public class AuthTokenProvider : IAuthTokenProvider
 {
@@ -28,43 +29,48 @@ public class AuthTokenProvider : IAuthTokenProvider
     private const string RefreshTokenKey = "bw_refresh_token";
 
     private readonly ProtectedSessionStorage _sessionStorage;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     private string? _cachedToken;
     private string? _cachedRefreshToken;
 
     // These flags are only set to true after a *successful* storage read
     // (i.e. after the interactive circuit is live).  A prerender attempt
-    // that throws / returns !Success leaves the flag false so the interactive
-    // circuit can retry.
+    // is skipped entirely so these flags never get poisoned.
     private bool _storageReadForAccess;
     private bool _storageReadForRefresh;
 
-    public AuthTokenProvider(ProtectedSessionStorage sessionStorage)
+    public AuthTokenProvider(
+        ProtectedSessionStorage sessionStorage,
+        IHttpContextAccessor httpContextAccessor)
     {
         _sessionStorage = sessionStorage;
+        _httpContextAccessor = httpContextAccessor;
     }
+
+    /// <summary>
+    /// Returns true when we are inside a static SSR render (prerender).
+    /// During SSR there is always an active HttpContext.  During an
+    /// interactive Blazor Server circuit, HttpContext is null.
+    /// ProtectedSessionStorage must NEVER be called during SSR — it will
+    /// deadlock because there is no JS-interop channel.
+    /// </summary>
+    private bool IsPrerendering => _httpContextAccessor.HttpContext is not null;
 
     public async Task<string?> GetTokenAsync()
     {
-        if (!_storageReadForAccess)
+        if (!_storageReadForAccess && !IsPrerendering)
         {
             try
             {
                 var result = await _sessionStorage.GetAsync<string>(AccessTokenKey);
-                if (result.Success)
-                {
-                    // Storage is reachable and returned a definitive answer
-                    // (even if the answer is "no token stored").
-                    _storageReadForAccess = true;
-                    _cachedToken = result.Value;
-                }
-                // If !result.Success we leave _storageReadForAccess = false so
-                // the next call (on the real interactive circuit) retries.
+                // Regardless of whether a token was stored, storage was reachable.
+                _storageReadForAccess = true;
+                _cachedToken = result.Success ? result.Value : null;
             }
             catch
             {
-                // JS interop unavailable (prerender).  Leave flag unset so the
-                // interactive circuit reads storage properly.
+                // Unexpected failure — leave flag unset so next call retries.
             }
         }
         return _cachedToken;
@@ -73,7 +79,7 @@ public class AuthTokenProvider : IAuthTokenProvider
     public async Task SetTokenAsync(string token)
     {
         _cachedToken = token;
-        _storageReadForAccess = true;   // Written by an interactive event — lock in.
+        _storageReadForAccess = true;
         try
         {
             await _sessionStorage.SetAsync(AccessTokenKey, token);
@@ -101,18 +107,15 @@ public class AuthTokenProvider : IAuthTokenProvider
 
     public async Task<string?> GetRefreshTokenAsync()
     {
-        if (!_storageReadForRefresh)
+        if (!_storageReadForRefresh && !IsPrerendering)
         {
             try
             {
                 var result = await _sessionStorage.GetAsync<string>(RefreshTokenKey);
-                if (result.Success)
-                {
-                    _storageReadForRefresh = true;
-                    _cachedRefreshToken = result.Value;
-                }
+                _storageReadForRefresh = true;
+                _cachedRefreshToken = result.Success ? result.Value : null;
             }
-            catch { /* prerender — leave flag unset */ }
+            catch { /* leave flag unset */ }
         }
         return _cachedRefreshToken;
     }
