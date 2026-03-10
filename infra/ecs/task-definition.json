@@ -32,11 +32,11 @@
         },
         {
           "name": "AdminAPI__BaseUrl",
-          "value": "https://api.placeholder.local"
+          "value": "https://api.elitebellwood.com"
         },
         {
           "name": "AuthServer__BaseUrl",
-          "value": "https://auth.placeholder.local"
+          "value": "https://auth.elitebellwood.com"
         }
       ],
       "logConfiguration": {
