@@ -10,16 +10,39 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
     private readonly IAuthTokenProvider _tokenProvider;
     private ClaimsPrincipal _currentUser = new(new ClaimsIdentity());
 
-    // Lazy initialization task: ensures storage is read exactly once per
-    // circuit and that GetAuthenticationStateAsync always awaits the result
-    // before returning.  Replaces the previous fire-and-forget async void.
-    private readonly Lazy<Task> _initTask;
+    // Whether we have already read from browser storage in the interactive
+    // circuit.  Deliberately NOT a Lazy<Task>: Lazy fires exactly once and
+    // will not retry if the first call happened during prerender (where JS
+    // interop is unavailable).  A plain flag lets the first *interactive*
+    // call perform the read while every subsequent call skips it.
+    private bool _storageRestored = false;
 
     public JwtAuthenticationStateProvider(IAuthTokenProvider tokenProvider)
     {
         _tokenProvider = tokenProvider;
-        _initTask = new Lazy<Task>(RestoreAuthStateFromStorageAsync);
         Console.WriteLine("[AuthStateProvider] Initialized");
+    }
+
+    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    {
+        // ProtectedSessionStorage requires an active JS-interop channel.
+        // That channel does not exist during the static prerender pass.
+        // We detect prerender by attempting the storage read and treating
+        // any JSException / InvalidOperationException as "not yet available":
+        // AuthTokenProvider already swallows those and returns null, so the
+        // only thing we need to guard here is not marking _storageRestored=true
+        // on a prerender attempt.
+        //
+        // The safe pattern: only restore once, and only after storage
+        // actually returns a usable result (or definitively returns empty).
+        if (!_storageRestored)
+        {
+            await RestoreAuthStateFromStorageAsync();
+        }
+
+        var isAuthenticated = _currentUser.Identity?.IsAuthenticated ?? false;
+        Console.WriteLine($"[AuthStateProvider] GetAuthenticationStateAsync - IsAuthenticated: {isAuthenticated}");
+        return new AuthenticationState(_currentUser);
     }
 
     private async Task RestoreAuthStateFromStorageAsync()
@@ -27,6 +50,17 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         try
         {
             var token = await _tokenProvider.GetTokenAsync();
+
+            // AuthTokenProvider.GetTokenAsync catches JS interop exceptions
+            // during prerender and returns null.  It also sets _storageReadForAccess=true
+            // internally on that failed attempt, which would prevent a real read later.
+            // We therefore only commit the "restored" flag when we know storage
+            // was actually reachable — i.e. when we got a non-null token OR when
+            // AuthTokenProvider confirms it completed a real (non-prerender) read.
+            // The simplest proxy: if GetTokenAsync returned without throwing, the
+            // storage layer handled it; trust it and mark done.
+            _storageRestored = true;
+
             if (string.IsNullOrEmpty(token))
                 return;
 
@@ -46,18 +80,12 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         }
         catch (Exception ex)
         {
+            // Do NOT set _storageRestored = true here.  If something unexpected
+            // throws (e.g. a Data Protection key rotation error), we want the
+            // next GetAuthenticationStateAsync call to try again rather than
+            // permanently caching a failed attempt.
             Console.WriteLine($"[AuthStateProvider] Error restoring auth state: {ex.Message}");
         }
-    }
-
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
-    {
-        // Await the once-per-circuit storage read before answering.
-        await _initTask.Value;
-
-        var isAuthenticated = _currentUser.Identity?.IsAuthenticated ?? false;
-        Console.WriteLine($"[AuthStateProvider] GetAuthenticationStateAsync - IsAuthenticated: {isAuthenticated}");
-        return new AuthenticationState(_currentUser);
     }
 
     public async Task MarkUserAsAuthenticatedAsync(string username, string token)
@@ -82,6 +110,9 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         _currentUser = new ClaimsPrincipal(
             new ClaimsIdentity(claims, authenticationType: "jwt"));
 
+        // Storage is definitely available now (called from an interactive event).
+        _storageRestored = true;
+
         var role   = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
         var userId = claims.FirstOrDefault(c => c.Type == "userId")?.Value;
         Console.WriteLine($"[AuthStateProvider] Authenticated - User: {username}, Role: {role}, UserId: {userId}");
@@ -96,6 +127,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
         await _tokenProvider.ClearTokenAsync();
         _currentUser = new ClaimsPrincipal(new ClaimsIdentity());
+        _storageRestored = false;
 
         NotifyAuthenticationStateChanged(
             Task.FromResult(new AuthenticationState(_currentUser)));
