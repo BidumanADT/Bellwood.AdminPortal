@@ -7,19 +7,20 @@ namespace Bellwood.AdminPortal.Services;
 /// Stores the JWT access token and refresh token in ProtectedSessionStorage.
 ///
 /// Security properties:
-/// - Encrypted server-side by ASP.NET Core Data Protection before the opaque
-///   blob is handed to the browser.  The raw token is never visible in DevTools.
-/// - Scoped to the browser *session* (sessionStorage under the hood): closing
-///   the tab or the browser clears the data automatically.
-/// - Completely isolated per browser / device / incognito window — different
-///   tabs to the same URL each have their own sessionStorage partition.
+/// - Encrypted server-side by ASP.NET Core Data Protection.  The raw token
+///   is never visible in browser DevTools.
+/// - Scoped to the browser session (sessionStorage): closing the tab clears
+///   the data automatically.
+/// - Completely isolated per browser / device / incognito window.
 /// - Registered AddScoped in Program.cs, so each Blazor circuit gets its own
-///   instance.  No sharing between users.
+///   instance with no sharing between users.
 ///
-/// The in-memory fields act as a write-through cache: once the token has been
-/// read from storage inside a single circuit lifetime we avoid re-reading on
-/// every call.  The cache is populated either on the first GetTokenAsync call
-/// (lazy) or by SetTokenAsync / ClearTokenAsync writes.
+/// Prerender safety:
+/// ProtectedSessionStorage requires an active JS-interop channel that does not
+/// exist during the static prerender pass.  GetAsync throws (or returns a
+/// failure result) during that phase.  We detect this by inspecting whether
+/// the read actually succeeded: if the result is not Success we leave the
+/// "read" flag unset so the first interactive-circuit call retries.
 /// </summary>
 public class AuthTokenProvider : IAuthTokenProvider
 {
@@ -30,7 +31,11 @@ public class AuthTokenProvider : IAuthTokenProvider
 
     private string? _cachedToken;
     private string? _cachedRefreshToken;
-    // Track whether we have already read from storage in this circuit instance.
+
+    // These flags are only set to true after a *successful* storage read
+    // (i.e. after the interactive circuit is live).  A prerender attempt
+    // that throws / returns !Success leaves the flag false so the interactive
+    // circuit can retry.
     private bool _storageReadForAccess;
     private bool _storageReadForRefresh;
 
@@ -43,16 +48,23 @@ public class AuthTokenProvider : IAuthTokenProvider
     {
         if (!_storageReadForAccess)
         {
-            _storageReadForAccess = true;
             try
             {
                 var result = await _sessionStorage.GetAsync<string>(AccessTokenKey);
-                _cachedToken = result.Success ? result.Value : null;
+                if (result.Success)
+                {
+                    // Storage is reachable and returned a definitive answer
+                    // (even if the answer is "no token stored").
+                    _storageReadForAccess = true;
+                    _cachedToken = result.Value;
+                }
+                // If !result.Success we leave _storageReadForAccess = false so
+                // the next call (on the real interactive circuit) retries.
             }
             catch
             {
-                // Storage may be unavailable during pre-render; treat as empty.
-                _cachedToken = null;
+                // JS interop unavailable (prerender).  Leave flag unset so the
+                // interactive circuit reads storage properly.
             }
         }
         return _cachedToken;
@@ -61,7 +73,7 @@ public class AuthTokenProvider : IAuthTokenProvider
     public async Task SetTokenAsync(string token)
     {
         _cachedToken = token;
-        _storageReadForAccess = true;
+        _storageReadForAccess = true;   // Written by an interactive event — lock in.
         try
         {
             await _sessionStorage.SetAsync(AccessTokenKey, token);
@@ -91,16 +103,16 @@ public class AuthTokenProvider : IAuthTokenProvider
     {
         if (!_storageReadForRefresh)
         {
-            _storageReadForRefresh = true;
             try
             {
                 var result = await _sessionStorage.GetAsync<string>(RefreshTokenKey);
-                _cachedRefreshToken = result.Success ? result.Value : null;
+                if (result.Success)
+                {
+                    _storageReadForRefresh = true;
+                    _cachedRefreshToken = result.Value;
+                }
             }
-            catch
-            {
-                _cachedRefreshToken = null;
-            }
+            catch { /* prerender — leave flag unset */ }
         }
         return _cachedRefreshToken;
     }
