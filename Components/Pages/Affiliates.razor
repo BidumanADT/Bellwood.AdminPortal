@@ -205,9 +205,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        @{
-            Navigation.NavigateTo("/login");
-        }
+        <RedirectToLogin />
     </NotAuthorized>
 </AuthorizeView>
 

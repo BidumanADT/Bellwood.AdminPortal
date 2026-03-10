@@ -143,10 +143,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        @{
-            Console.WriteLine("[Bookings] AuthorizeView: NotAuthorized section rendering - redirecting to login");
-            Navigation.NavigateTo("/login");
-        }
+        <RedirectToLogin />
     </NotAuthorized>
 </AuthorizeView>
 

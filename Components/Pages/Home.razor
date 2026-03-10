@@ -11,10 +11,7 @@
         }
     </Authorized>
     <NotAuthorized>
-        @{
-            // If not authenticated, redirect to login
-            Navigation.NavigateTo("/login");
-        }
+        <RedirectToLogin />
     </NotAuthorized>
 </AuthorizeView>
 
