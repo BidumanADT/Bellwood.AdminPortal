@@ -49,8 +49,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
 builder.Services.AddTransient<CorrelationIdPropagationHandler>();
 
-// Token store + auth state provider - MUST BE SINGLETON to persist across circuits
-builder.Services.AddSingleton<IAuthTokenProvider, AuthTokenProvider>();
+// Token store + auth state provider - SCOPED to isolate auth per user circuit
+builder.Services.AddScoped<IAuthTokenProvider, AuthTokenProvider>();
 builder.Services.AddSingleton<IAdminApiKeyProvider, AdminApiKeyProvider>();
 
 // Business services
@@ -71,11 +71,11 @@ builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 // Phase 3.1: Audit log service
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
-// Register the concrete provider as singleton so it persists
-builder.Services.AddSingleton<JwtAuthenticationStateProvider>();
+// Register the concrete provider as scoped so each circuit has its own auth state
+builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 
 // Expose it as the AuthenticationStateProvider used by Router/AuthorizeView
-builder.Services.AddSingleton<AuthenticationStateProvider>(sp =>
+builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
 // Give components access to the auth state cascade
