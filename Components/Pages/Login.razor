@@ -6,6 +6,7 @@
 @using System.IdentityModel.Tokens.Jwt
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Components
 @inject IHttpClientFactory HttpFactory
 @inject NavigationManager Navigation
 @inject ILogger<Login> Logger
@@ -166,6 +167,12 @@
 
             // Full-page redirect so the browser picks up the new Set-Cookie header
             Navigation.NavigateTo("/main", forceLoad: true);
+        }
+        catch (NavigationException)
+        {
+            // NavigationException is thrown by NavigateTo during SSR to trigger
+            // an HTTP redirect — this is expected, not a login failure.
+            throw;
         }
         catch (Exception ex)
         {
