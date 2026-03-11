@@ -1,6 +1,7 @@
 using Bellwood.AdminPortal.Components;
 using Bellwood.AdminPortal.Observability;
 using Bellwood.AdminPortal.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
@@ -33,10 +34,19 @@ builder.Host.UseSerilog();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Phase 2 Fix: Add authentication services for [Authorize] attribute support
-builder.Services.AddAuthentication()
-    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
-        BlazorAuthenticationHandler>("Blazor", options => { });
+// Cookie authentication — server-readable on every HTTP request (no browser storage).
+// Login calls AuthServer for JWT, then issues a local auth cookie via SignInAsync.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+    });
 
 // Blazor-style auth with policies
 builder.Services.AddAuthorizationCore(options =>
@@ -71,12 +81,9 @@ builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 // Phase 3.1: Audit log service
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
-// Register the concrete provider as scoped so each circuit has its own auth state
-builder.Services.AddScoped<JwtAuthenticationStateProvider>();
-
-// Expose it as the AuthenticationStateProvider used by Router/AuthorizeView
-builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
-    sp.GetRequiredService<JwtAuthenticationStateProvider>());
+// Cookie-backed auth state provider — reads HttpContext.User during SSR,
+// caches for the interactive circuit, periodically revalidates.
+builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthStateProvider>();
 
 // Give components access to the auth state cascade
 builder.Services.AddCascadingAuthenticationState();
