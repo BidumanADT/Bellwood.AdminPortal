@@ -1,133 +1,68 @@
-﻿using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Bellwood.AdminPortal.Services;
 
 /// <summary>
-/// Stores the JWT access token and refresh token in ProtectedSessionStorage.
+/// Provides JWT access and refresh tokens to outbound API services.
 ///
-/// Security properties:
-/// - Encrypted server-side by ASP.NET Core Data Protection.  The raw token
-///   is never visible in browser DevTools.
-/// - Scoped to the browser session (sessionStorage): closing the tab clears
-///   the data automatically.
-/// - Completely isolated per browser / device / incognito window.
-/// - Registered AddScoped in Program.cs, so each Blazor circuit gets its own
-///   instance with no sharing between users.
+/// Token source priority:
+/// 1. In-memory override (set by TokenRefreshService when tokens are refreshed
+///    during an interactive circuit).
+/// 2. Claims stored in the auth cookie (set at login via SignInAsync).
 ///
-/// Prerender safety:
-/// ProtectedSessionStorage requires an active JS-interop channel that does not
-/// exist during the static SSR prerender pass.  Calling it during prerender
-/// can deadlock (the await hangs waiting for a circuit that doesn't exist).
-/// We detect prerender by checking IHttpContextAccessor: during static SSR
-/// there is an active HttpContext; during an interactive circuit there is not.
-/// When HttpContext is present we skip all storage calls entirely.
+/// Registered as scoped — each Blazor circuit gets its own instance.
+/// No cross-user leakage is possible.
+/// No dependency on browser sessionStorage.
 /// </summary>
 public class AuthTokenProvider : IAuthTokenProvider
 {
-    private const string AccessTokenKey  = "bw_access_token";
-    private const string RefreshTokenKey = "bw_refresh_token";
+    private readonly AuthenticationStateProvider _authStateProvider;
 
-    private readonly ProtectedSessionStorage _sessionStorage;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    // In-memory overrides set by token refresh within the current circuit.
+    // These take priority over cookie claims because the cookie can't be
+    // rewritten during a SignalR circuit (no HttpContext).
+    private string? _accessTokenOverride;
+    private string? _refreshTokenOverride;
 
-    private string? _cachedToken;
-    private string? _cachedRefreshToken;
-
-    // These flags are only set to true after a *successful* storage read
-    // (i.e. after the interactive circuit is live).  A prerender attempt
-    // is skipped entirely so these flags never get poisoned.
-    private bool _storageReadForAccess;
-    private bool _storageReadForRefresh;
-
-    public AuthTokenProvider(
-        ProtectedSessionStorage sessionStorage,
-        IHttpContextAccessor httpContextAccessor)
+    public AuthTokenProvider(AuthenticationStateProvider authStateProvider)
     {
-        _sessionStorage = sessionStorage;
-        _httpContextAccessor = httpContextAccessor;
+        _authStateProvider = authStateProvider;
     }
-
-    /// <summary>
-    /// Returns true when we are inside a static SSR render (prerender).
-    /// During SSR there is always an active HttpContext.  During an
-    /// interactive Blazor Server circuit, HttpContext is null.
-    /// ProtectedSessionStorage must NEVER be called during SSR — it will
-    /// deadlock because there is no JS-interop channel.
-    /// </summary>
-    private bool IsPrerendering => _httpContextAccessor.HttpContext is not null;
 
     public async Task<string?> GetTokenAsync()
     {
-        if (!_storageReadForAccess && !IsPrerendering)
-        {
-            try
-            {
-                var result = await _sessionStorage.GetAsync<string>(AccessTokenKey);
-                // Regardless of whether a token was stored, storage was reachable.
-                _storageReadForAccess = true;
-                _cachedToken = result.Success ? result.Value : null;
-            }
-            catch
-            {
-                // Unexpected failure — leave flag unset so next call retries.
-            }
-        }
-        return _cachedToken;
+        if (_accessTokenOverride != null)
+            return _accessTokenOverride;
+
+        var authState = await _authStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst("access_token")?.Value;
     }
 
-    public async Task SetTokenAsync(string token)
+    public Task SetTokenAsync(string token)
     {
-        _cachedToken = token;
-        _storageReadForAccess = true;
-        try
-        {
-            await _sessionStorage.SetAsync(AccessTokenKey, token);
-        }
-        catch
-        {
-            // If storage write fails the in-memory value still works for this
-            // circuit, but will not survive a circuit restart.
-        }
-    }
-
-    public async Task ClearTokenAsync()
-    {
-        _cachedToken = null;
-        _cachedRefreshToken = null;
-        _storageReadForAccess = false;
-        _storageReadForRefresh = false;
-        try
-        {
-            await _sessionStorage.DeleteAsync(AccessTokenKey);
-            await _sessionStorage.DeleteAsync(RefreshTokenKey);
-        }
-        catch { /* best-effort */ }
+        _accessTokenOverride = token;
+        return Task.CompletedTask;
     }
 
     public async Task<string?> GetRefreshTokenAsync()
     {
-        if (!_storageReadForRefresh && !IsPrerendering)
-        {
-            try
-            {
-                var result = await _sessionStorage.GetAsync<string>(RefreshTokenKey);
-                _storageReadForRefresh = true;
-                _cachedRefreshToken = result.Success ? result.Value : null;
-            }
-            catch { /* leave flag unset */ }
-        }
-        return _cachedRefreshToken;
+        if (_refreshTokenOverride != null)
+            return _refreshTokenOverride;
+
+        var authState = await _authStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst("refresh_token")?.Value;
     }
 
-    public async Task SetRefreshTokenAsync(string refreshToken)
+    public Task SetRefreshTokenAsync(string refreshToken)
     {
-        _cachedRefreshToken = refreshToken;
-        _storageReadForRefresh = true;
-        try
-        {
-            await _sessionStorage.SetAsync(RefreshTokenKey, refreshToken);
-        }
-        catch { /* best-effort */ }
+        _refreshTokenOverride = refreshToken;
+        return Task.CompletedTask;
+    }
+
+    public Task ClearTokenAsync()
+    {
+        _accessTokenOverride = null;
+        _refreshTokenOverride = null;
+        return Task.CompletedTask;
     }
 }

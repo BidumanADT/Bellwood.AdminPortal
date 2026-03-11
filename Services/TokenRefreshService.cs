@@ -17,21 +17,18 @@ public class TokenRefreshService : ITokenRefreshService, IDisposable
 {
     private readonly IHttpClientFactory _httpFactory;
     private readonly IAuthTokenProvider _tokenProvider;
-    private readonly JwtAuthenticationStateProvider _authStateProvider;
     private readonly ILogger<TokenRefreshService> _logger;
-    
+
     private Timer? _refreshTimer;
     private bool _isRefreshing;
-    
+
     public TokenRefreshService(
         IHttpClientFactory httpFactory,
         IAuthTokenProvider tokenProvider,
-        JwtAuthenticationStateProvider authStateProvider,
         ILogger<TokenRefreshService> logger)
     {
         _httpFactory = httpFactory;
         _tokenProvider = tokenProvider;
-        _authStateProvider = authStateProvider;
         _logger = logger;
     }
     
@@ -191,22 +188,16 @@ public class TokenRefreshService : ITokenRefreshService, IDisposable
             _logger.LogInformation("[TokenRefresh] Token refreshed successfully - New token length: {Length}", 
                 accessToken.Length);
             
-            // Update stored tokens
+            // Update the in-memory token override for this circuit.
+            // The cookie still holds the original tokens; the override takes
+            // priority for outbound API calls during this circuit's lifetime.
             await _tokenProvider.SetTokenAsync(accessToken);
-            
+
             if (!string.IsNullOrEmpty(newRefreshToken))
             {
                 await _tokenProvider.SetRefreshTokenAsync(newRefreshToken);
                 _logger.LogInformation("[TokenRefresh] New refresh token received");
             }
-            
-            // Extract username from new token for auth state update
-            var handler = new JwtSecurityTokenHandler();
-            var jsonToken = handler.ReadJwtToken(accessToken);
-            var username = jsonToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown";
-            
-            // Update authentication state with new token
-            await _authStateProvider.MarkUserAsAuthenticatedAsync(username, accessToken);
             
             _logger.LogInformation("[TokenRefresh] ========== TOKEN REFRESH SUCCESS ==========");
             return true;

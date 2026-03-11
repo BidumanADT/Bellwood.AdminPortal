@@ -1,17 +1,21 @@
-﻿@page "/logout"
-@using Bellwood.AdminPortal.Services
+@page "/logout"
+@* No @rendermode — this page must be SSR so HttpContext is available for SignOutAsync. *@
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
 @inject NavigationManager Navigation
-@inject IAuthTokenProvider TokenProvider
-@inject JwtAuthenticationStateProvider JwtAuthenticationStateProvider
+@inject ILogger<Logout> Logger
 
 @code {
     [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
+    private HttpContext HttpContext { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        await TokenProvider.ClearTokenAsync();
-        await JwtAuthenticationStateProvider.MarkUserAsLoggedOutAsync();
-        Navigation.NavigateTo("/login");
+        Logger.LogInformation("[Logout] Signing out user: {User}", HttpContext.User?.Identity?.Name);
+
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        // Full-page redirect to clear the cookie from the browser and show the login page
+        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }
