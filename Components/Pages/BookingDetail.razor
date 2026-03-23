@@ -91,12 +91,17 @@
                                     </div>
                                 }
 
+                                @{
+                                    var centralTz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+                                    var pickupCentral = TimeZoneInfo.ConvertTimeFromUtc(
+                                        DateTime.SpecifyKind(booking.PickupDateTime, DateTimeKind.Utc), centralTz);
+                                }
                                 <div class="mb-3">
-                                    <strong>Pickup Time:</strong> @booking.PickupDateTime.ToLocalTime().ToString("g")
+                                    <strong>Pickup Time:</strong> @pickupCentral.ToString("g") CT
                                 </div>
 
                                 <div class="mb-3">
-                                    <strong>Created:</strong> @booking.CreatedUtc.ToLocalTime().ToString("g")
+                                    <strong>Created:</strong> @TimeZoneInfo.ConvertTimeFromUtc(booking.CreatedUtc, centralTz).ToString("g") CT
                                 </div>
                             </div>
                         </div>
