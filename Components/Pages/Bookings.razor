@@ -111,14 +111,17 @@
                                             </span>
                                         </div>
                                     </div>
+                                    @{
+                                        var centralTz = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+                                    }
                                     <p class="card-text text-muted mb-1">
-                                        <strong>@booking.VehicleClass</strong> • @booking.PickupDateTime.ToLocalTime().ToString("g")
+                                        <strong>@booking.VehicleClass</strong> • @TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(booking.PickupDateTime, DateTimeKind.Utc), centralTz).ToString("g") CT
                                     </p>
                                     <p class="card-text mb-1">
                                         📍 @booking.PickupLocation
                                     </p>
                                     <p class="card-text text-muted small">
-                                        Booker: @booking.BookerName • Created: @booking.CreatedUtc.ToLocalTime().ToString("g")
+                                        Booker: @booking.BookerName • Created: @TimeZoneInfo.ConvertTimeFromUtc(booking.CreatedUtc, centralTz).ToString("g") CT
                                     </p>
                                     <p class="card-text small mt-2">
                                         <strong>Driver:</strong> 
